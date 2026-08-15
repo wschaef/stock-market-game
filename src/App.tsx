@@ -7,8 +7,17 @@ import {
   ranking,
   reduce,
   setupGame,
+  type Company,
   type GameState,
 } from "./engine";
+import { relativeBarPercents } from "./ui/relativeBars";
+
+const COMPANY_TONE: Record<Company, string> = {
+  commerzbank: "tone-commerzbank",
+  bayer: "tone-bayer",
+  bmw: "tone-bmw",
+  bp: "tone-bp",
+};
 
 function eventText(state: GameState): string[] {
   return state.lastEvents.map((event) => {
@@ -23,19 +32,22 @@ function eventText(state: GameState): string[] {
   });
 }
 
-function Setup({
-  onStart,
-}: {
-  onStart: (names: string[]) => void
-}) {
+function Setup({ onStart }: { onStart: (names: string[]) => void }) {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState(["Ada", "Bob", "Chen", "Dia"]);
   return (
-    <div className="wrap">
-      <h1>Stock Market Game</h1>
-      <p>Hotseat Börsenspiel. Draw or trade. You cannot trade after playing an Action card — only after a Risk, or on a Trade-only turn.</p>
-      <label>
-        Players{" "}
+    <div className="shell setup-shell">
+      <header className="brand-block">
+        <p className="brand">Börsenspiel</p>
+        <h1>Hotseat market</h1>
+        <p className="lede">
+          Draw or trade on one device. You cannot trade after an Action card —
+          only after a Risk, or on a Trade-only turn.
+        </p>
+      </header>
+
+      <label className="field">
+        Players
         <select
           value={count}
           onChange={(e) => setCount(Number(e.target.value))}
@@ -45,27 +57,152 @@ function Setup({
           <option value={4}>4</option>
         </select>
       </label>
-      <div className="panel">
+
+      <div className="name-grid">
         {names.slice(0, count).map((name, i) => (
-          <p key={i}>
-            <label>
-              Player {i + 1}{" "}
-              <input
-                value={name}
-                onChange={(e) => {
-                  const next = [...names];
-                  next[i] = e.target.value;
-                  setNames(next);
-                }}
-              />
-            </label>
-          </p>
+          <label className="field" key={i}>
+            Player {i + 1}
+            <input
+              value={name}
+              onChange={(e) => {
+                const next = [...names];
+                next[i] = e.target.value;
+                setNames(next);
+              }}
+            />
+          </label>
         ))}
       </div>
-      <button type="button" onClick={() => onStart(names.slice(0, count))}>
+
+      <button type="button" className="cta" onClick={() => onStart(names.slice(0, count))}>
         Start game
       </button>
     </div>
+  );
+}
+
+function MarketDiagram({
+  state,
+  qty,
+  setQty,
+  onBuy,
+  onSell,
+  onEndTrade,
+}: {
+  state: GameState
+  qty: number
+  setQty: (n: number) => void
+  onBuy: (company: Company) => void
+  onSell: (company: Company) => void
+  onEndTrade: () => void
+}) {
+  const player = state.players[state.currentPlayerIndex];
+  const bars = relativeBarPercents(state.prices);
+  const trading = canTrade(state);
+
+  return (
+    <section className="market-panel" aria-label="Share prices">
+      <div className="section-head">
+        <h2>Share prices</h2>
+        <p>Bar length shows each price relative to the highest.</p>
+      </div>
+
+      <ul className="price-diagram">
+        {COMPANIES.map((company) => (
+          <li className={`price-row ${COMPANY_TONE[company]}`} key={company}>
+            <div className="price-meta">
+              <span className="price-name">{COMPANY_LABEL[company]}</span>
+              <span className="price-value">${state.prices[company]}</span>
+            </div>
+            <div className="bar-track" aria-hidden="true">
+              <div
+                className="bar-fill"
+                style={{ width: `${bars[company]}%` }}
+              />
+            </div>
+            <div className="price-stats">
+              <span>You {player.shares[company]}</span>
+              <span>Bank {state.bankShares[company]}</span>
+            </div>
+            {trading ? (
+              <div className="share-trade">
+                <button type="button" onClick={() => onBuy(company)}>
+                  Buy
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => onSell(company)}
+                >
+                  Sell
+                </button>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+
+      {trading ? (
+        <div className="trade-toolbar">
+          <label className="field inline">
+            Quantity
+            <input
+              type="number"
+              min={1}
+              value={qty}
+              onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+            />
+          </label>
+          <button type="button" className="cta" onClick={onEndTrade}>
+            End turn
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function Hand({
+  state,
+  onPlay,
+}: {
+  state: GameState
+  onPlay: (cardId: string) => void
+}) {
+  const player = state.players[state.currentPlayerIndex];
+  const playable = state.phase === "chooseHandCard";
+
+  return (
+    <section className="hand-panel" aria-label="Your cards">
+      <div className="section-head">
+        <h2>Your cards</h2>
+        <p>
+          {playable
+            ? "Pick one card to play."
+            : "Visible for your whole turn — playable after you draw an Action."}
+        </p>
+      </div>
+      <div className={`hand ${playable ? "hand-playable" : "hand-readonly"}`}>
+        {player.hand.map((card) =>
+          playable ? (
+            <button
+              type="button"
+              className="card"
+              key={card.id}
+              onClick={() => onPlay(card.id)}
+            >
+              <strong>{card.title}</strong>
+              <small>{card.text}</small>
+            </button>
+          ) : (
+            <article className="card" key={card.id}>
+              <strong>{card.title}</strong>
+              <small>{card.text}</small>
+            </article>
+          ),
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -82,110 +219,88 @@ function Board({
   const player = state.players[state.currentPlayerIndex];
   const others = state.players.filter((_, i) => i !== state.currentPlayerIndex);
 
-  function act(
-    intent: Parameters<typeof reduce>[1],
-  ) {
-    const result = reduce(state, intent);
-    setState(result.state);
+  function act(intent: Parameters<typeof reduce>[1]) {
+    setState(reduce(state, intent).state);
   }
 
   const phaseHelp = {
-    chooseTurn: `${player.name}: Draw a card, or Trade only (no draw).`,
-    chooseHandCard: `${player.name}: play one of your 5 cards. You will not be able to trade after this.`,
-    chooseCompany: `${player.name}: choose which company gets [?].`,
-    optionalTrade: `${player.name}: buy and/or sell, then end the turn.`,
+    chooseTurn: "Draw a card, or Trade only (no draw).",
+    chooseHandCard: "Play one of your five cards. You cannot trade after this.",
+    chooseCompany: "Choose which company gets [?].",
+    optionalTrade: "Buy and/or sell on the share rows, then end the turn.",
     gameOver: "Draw pile is empty. Highest net worth wins.",
   }[state.phase];
 
   return (
-    <div className="wrap">
-      <div className="row">
-        <h1>Stock Market Game</h1>
+    <div className="shell board-shell">
+      <header className="top-bar">
+        <p className="brand">Börsenspiel</p>
         <button type="button" className="secondary" onClick={onReset}>
           New game
         </button>
-      </div>
+      </header>
 
-      <div className="market">
-        {COMPANIES.map((company) => (
-          <div className="price-card" key={company}>
-            {COMPANY_LABEL[company]}
-            <strong>{state.prices[company]}</strong>
-            <small>Bank: {state.bankShares[company]}</small>
-          </div>
-        ))}
-      </div>
+      {state.phase !== "gameOver" ? (
+        <div className="turn-banner" role="status">
+          <span className="turn-label">On turn</span>
+          <strong className="turn-name">{player.name}</strong>
+          <span className="turn-cash">${player.cash}</span>
+          <span className="turn-pile">Pile {state.drawPile.length}</span>
+        </div>
+      ) : null}
 
-      <p className="others">
-        {others.map((p) => (
-          <span key={p.id}>
-            {p.name}: ${p.cash} ·{" "}
-            {COMPANIES.map((c) => `${COMPANY_LABEL[c]} ${p.shares[c]}`).join(
-              " · ",
-            )}{" "}
-          </span>
-        ))}
-      </p>
-
-      <div className="panel">
-        <h2>
-          {player.name} · ${player.cash} · pile {state.drawPile.length}
-        </h2>
-        <p>
-          {COMPANIES.map(
-            (c) => `${COMPANY_LABEL[c]} ${player.shares[c]}`,
-          ).join(" · ")}
+      <p className="phase-help">{phaseHelp}</p>
+      {state.lastError ? <p className="error">{state.lastError}</p> : null}
+      {eventText(state).map((line) => (
+        <p className="event" key={line}>
+          {line}
         </p>
-        <p>{phaseHelp}</p>
-        {state.lastError ? <p className="error">{state.lastError}</p> : null}
-        {eventText(state).map((line) => (
-          <p className="event" key={line}>
-            {line}
-          </p>
-        ))}
-        {state.lastDrawn ? (
-          <p>
-            Last drawn: <strong>{state.lastDrawn.title}</strong>
-            {state.lastDrawn.text ? ` — ${state.lastDrawn.text}` : ""}
-          </p>
-        ) : null}
-      </div>
+      ))}
+      {state.lastDrawn ? (
+        <p className="drawn">
+          Last drawn: <strong>{state.lastDrawn.title}</strong>
+          {state.lastDrawn.text ? ` — ${state.lastDrawn.text}` : ""}
+        </p>
+      ) : null}
+
+      <MarketDiagram
+        state={state}
+        qty={qty}
+        setQty={setQty}
+        onBuy={(company) => act({ type: "buy", company, quantity: qty })}
+        onSell={(company) => act({ type: "sell", company, quantity: qty })}
+        onEndTrade={() => act({ type: "endTrade" })}
+      />
+
+      {state.phase !== "gameOver" ? (
+        <Hand
+          state={state}
+          onPlay={(cardId) => act({ type: "playCard", cardId })}
+        />
+      ) : null}
 
       {state.phase === "chooseTurn" ? (
-        <div className="row">
-          <button type="button" onClick={() => act({ type: "draw" })}>
+        <div className="action-row">
+          <button type="button" className="cta" onClick={() => act({ type: "draw" })}>
             Draw
           </button>
-          <button type="button" className="secondary" onClick={() => act({ type: "startTrade" })}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => act({ type: "startTrade" })}
+          >
             Trade only
           </button>
         </div>
       ) : null}
 
-      {state.phase === "chooseHandCard" ? (
-        <div className="hand">
-          {player.hand.map((card) => (
-            <button
-              type="button"
-              className="card"
-              key={card.id}
-              onClick={() => act({ type: "playCard", cardId: card.id })}
-            >
-              {card.title}
-              <small>{card.text}</small>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
       {state.phase === "chooseCompany" && state.pendingCard ? (
-        <div>
-          <p>
-            {state.pendingCard.title}
-            <br />
-            <small>{state.pendingCard.text}</small>
-          </p>
-          <div className="row">
+        <section className="picker-panel">
+          <div className="section-head">
+            <h2>{state.pendingCard.title}</h2>
+            <p>{state.pendingCard.text}</p>
+          </div>
+          <div className="action-row">
             {allowedChoices(state.pendingCard).map((company) => (
               <button
                 type="button"
@@ -196,64 +311,46 @@ function Board({
               </button>
             ))}
           </div>
-        </div>
+        </section>
       ) : null}
 
-      {canTrade(state) ? (
-        <div className="panel">
-          <div className="row">
-            <label>
-              Quantity{" "}
-              <input
-                type="number"
-                min={1}
-                value={qty}
-                onChange={(e) => setQty(Number(e.target.value))}
-              />
-            </label>
-            <button type="button" onClick={() => act({ type: "endTrade" })}>
-              End turn
-            </button>
+      {others.length > 0 && state.phase !== "gameOver" ? (
+        <section className="others-panel" aria-label="Other players">
+          <div className="section-head">
+            <h2>Waiting</h2>
           </div>
-          {COMPANIES.map((company) => (
-            <p key={company} className="row">
-              <span>
-                {COMPANY_LABEL[company]} @ {state.prices[company]}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  act({ type: "buy", company, quantity: qty })
-                }
-              >
-                Buy
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() =>
-                  act({ type: "sell", company, quantity: qty })
-                }
-              >
-                Sell
-              </button>
-            </p>
-          ))}
-        </div>
+          <ul className="others-list">
+            {others.map((p) => (
+              <li key={p.id}>
+                <strong>{p.name}</strong>
+                <span>${p.cash}</span>
+                <span>
+                  {COMPANIES.map(
+                    (c) => `${COMPANY_LABEL[c]} ${p.shares[c]}`,
+                  ).join(" · ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {state.phase === "gameOver" ? (
-        <div className="panel">
-          <h2>Game over</h2>
-          <ol>
+        <section className="game-over-panel">
+          <div className="section-head">
+            <h2>Game over</h2>
+            <p>Highest net worth wins.</p>
+          </div>
+          <ol className="ranking">
             {ranking(state).map((row) => (
               <li key={row.name}>
-                {row.name}: ${row.netWorth}
-                {row.tied ? " (tie)" : ""}
+                <strong>{row.name}</strong>
+                <span>${row.netWorth}</span>
+                {row.tied ? <em>tie</em> : null}
               </li>
             ))}
           </ol>
-        </div>
+        </section>
       ) : null}
     </div>
   );
