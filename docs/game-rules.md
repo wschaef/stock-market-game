@@ -1,5 +1,32 @@
 **Stock Market Game (Börsenspiel) – Complete Rules & Card Deck**
 
+This file is the rules source for the digital game. The **Digital rules** section is authoritative for software. The card list matches the table deck.
+
+## Digital rules (authoritative)
+
+These replace physical-board ambiguities for the browser port.
+
+- **Players:** 2–4, hotseat, clockwise, player 1 starts.
+- **Money:** integer dollars. Each player starts with **$1,000**. Note denominations are unused on screen.
+- **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (6 per player).
+- **Risk cards:** Only in the draw pile mix (3 per player). Leftover cards after dealing/pile construction are unused.
+- **Turn choice:** **Draw** or **Trade only**.
+  - **Draw:** reveal the top card. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell.
+  - **Trade only:** no draw; buy and/or sell at current prices.
+- **No trade after an Action play.** Trading is allowed only on a Trade-only turn or after a Risk. This is the core of the game.
+- **`[?]`:** the current player selects which company gets that effect. The named company on the card is already fixed, so the pick is one of the **other three**.
+- **Prices** are integers. After each company’s effect:
+  - If **target > 250** (split): new price = **floor(target / 2)**; **each shareholder’s** shares of that company **double**. Bank unsold certificates do **not** double. Repeat until price ≤ 250. **250** is legal (no split).
+  - If **target < 10** (wipeout): all player shares of that company are **lost** (no cash); bank supply of that company resets to **40**; price resets to **100**. **10** is legal (no wipeout).
+  - Otherwise the price becomes the target.
+- Multiplier **1/2** uses integer **floor**, then the split/wipeout checks.
+- Effects on a card apply **per company independently**. Risk cards that omit a company treat it as **+0**.
+- **Bank:** 40 shares per company at setup. Cannot buy more than the bank holds, sell more than you hold, or spend more cash than you have.
+- **End:** finish resolving the card that emptied the draw pile (including optional post-Risk trade), then score  
+  `net worth = sum(shares[company] × price[company]) + cash`. Highest wins; ties allowed.
+
+---
+
   
 
 
