@@ -1,0 +1,46 @@
+---
+description: Enforce staged delivery gates and artifact handoffs; no coding before approvals.
+alwaysApply: true
+---
+
+# Workflow gates
+
+## Stages (do not skip)
+
+1. **Requirements** — agree and write/update the feature requirements artifact.
+2. **Plan** — produce an implementation plan; wait for explicit human approval.
+3. **Implement** — only after requirements **and** plan are approved.
+4. **Review** — verify against the acceptance checklist, tests, and demo/summary.
+5. **Done / commit** — the human decides acceptance and performs (or explicitly requests) the commit.
+
+## Hard stops
+
+- Do **not** write application or scaffolding code until the human has approved requirements and the implementation plan for that slice.
+- Do **not** commit, push, or open/merge a PR unless the human explicitly asks.
+- Do **not** expand scope beyond the approved plan.
+- Do **not** continue a long architecture debate into implementation in the same bloated context.
+
+## Process artifacts (handoff contract)
+
+Per-feature truth lives in the repo, not in chat memory:
+
+| Stage | Artifact |
+| --- | --- |
+| Requirements (approved) | `docs/process/FEATURES/<id>-requirements.md` |
+| Architecture (when needed) | `docs/process/DECISIONS/<id>-adr.md` |
+| Plan (approved) | `docs/process/FEATURES/<id>-plan.md` and/or a Cursor Plan saved to the workspace |
+| Implement → review | Branch + tests + short results summary (checklist / demo) |
+
+Templates: `docs/process/FEATURES/_template-requirements.md`, `docs/process/FEATURES/_template-plan.md`, `docs/process/DECISIONS/_template-adr.md`.  
+Process overview: `docs/process/README.md`.
+
+## Context handoff
+
+- New stage or new chat: pass **only** the approved artifact file(s) (e.g. `@` the requirements + plan). Do not rely on prior chat transcript.
+- Architecture sparring ends with an ADR (or a short decision section in requirements). Implement in a fresh context.
+- Prefer one feature slice per implement chat.
+- Standing rules live in `.cursor/rules/`. Do not duplicate them into chat.
+
+## What the human reviews
+
+By default the human reviews **outcomes**: acceptance checklist, test results, and a short demo/summary — not code unless they ask.
