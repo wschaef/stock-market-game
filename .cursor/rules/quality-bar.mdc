@@ -1,0 +1,32 @@
+---
+description: Thin quality bar — TDD, YAGNI/KISS/DRY-lite, everything as code; no pattern catalog.
+alwaysApply: true
+---
+
+# Quality bar
+
+## Non-negotiables
+
+- **TDD for behavior changes:** write a failing test first, then implement until it passes. Tests are the acceptance contract.
+- **YAGNI / KISS:** build only what the approved plan requires. No speculative features, frameworks, or layers “for later.”
+- **DRY (lightly):** remove real duplication; do not invent premature abstractions.
+- **Small units:** prefer focused functions/modules with clear names and one job (SRP-lite).
+- **Fail fast:** validate inputs and surface errors early with clear messages.
+- **Everything as code:** tooling, process templates, and config that can live in the repo should. Never commit secrets.
+
+## Explicitly not required
+
+- Full SOLID essays, Gang-of-Four pattern catalogs, or third-party “clean code” skill packs as always-on context.
+- Design patterns by default — use a pattern only when the approved plan or an ADR calls for it.
+
+## Definition of done (implement stage)
+
+- Acceptance checklist from the approved requirements is met.
+- Lint and tests relevant to the change are green (once those tools exist in the repo).
+- Short results summary for the human (what shipped vs checklist; how to verify). Demo artifact when UI behavior is in scope.
+- No drive-by refactors or unrelated file churn.
+
+## Consistency
+
+- Follow existing project conventions when code exists.
+- Prefer updating process artifacts over restating decisions in chat.
