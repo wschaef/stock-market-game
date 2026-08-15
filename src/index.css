@@ -240,6 +240,57 @@ h2 {
   gap: 0.85rem;
 }
 
+.price-scale {
+  margin: 0 0 0.75rem;
+}
+
+.price-scale-track {
+  position: relative;
+  height: 1.4rem;
+  margin: 0 0 0.15rem;
+  border-bottom: 1px solid var(--line);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / 24 - 1px),
+    rgba(19, 32, 51, 0.12) calc(100% / 24 - 1px),
+    rgba(19, 32, 51, 0.12) calc(100% / 24)
+  );
+}
+
+.price-scale .tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  height: 0.45rem;
+  border-left: 1px solid rgba(19, 32, 51, 0.28);
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding-top: 0.5rem;
+  white-space: nowrap;
+}
+
+.price-scale .tick.major {
+  height: 0.7rem;
+  border-left-color: rgba(19, 32, 51, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-track {
+  height: 18px;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(100% / 24 - 1px),
+      rgba(19, 32, 51, 0.06) calc(100% / 24 - 1px),
+      rgba(19, 32, 51, 0.06) calc(100% / 24)
+    ),
+    rgba(19, 32, 51, 0.08);
+  overflow: hidden;
+}
+
 .price-row {
   display: grid;
   gap: 0.4rem;
@@ -267,13 +318,6 @@ h2 {
 .price-value {
   font-variant-numeric: tabular-nums;
   font-weight: 650;
-}
-
-.bar-track {
-  height: 18px;
-  border-radius: 999px;
-  background: rgba(19, 32, 51, 0.08);
-  overflow: hidden;
 }
 
 .bar-fill {

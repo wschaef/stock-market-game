@@ -10,7 +10,13 @@ import {
   type Company,
   type GameState,
 } from "./engine";
-import { relativeBarPercents } from "./ui/relativeBars";
+import {
+  PRICE_BOARD_MAX,
+  PRICE_BOARD_MIN,
+  PRICE_BOARD_STEP,
+  priceBoardPercents,
+  priceBoardTicks,
+} from "./ui/relativeBars";
 
 const COMPANY_TONE: Record<Company, string> = {
   commerzbank: "tone-commerzbank",
@@ -97,14 +103,37 @@ function MarketDiagram({
   onEndTrade: () => void
 }) {
   const player = state.players[state.currentPlayerIndex];
-  const bars = relativeBarPercents(state.prices);
+  const bars = priceBoardPercents(state.prices);
+  const ticks = priceBoardTicks();
   const trading = canTrade(state);
+  const span = PRICE_BOARD_MAX - PRICE_BOARD_MIN;
 
   return (
     <section className="market-panel" aria-label="Share prices">
       <div className="section-head">
         <h2>Share prices</h2>
-        <p>Bar length shows each price relative to the highest.</p>
+        <p>
+          Board scale ${PRICE_BOARD_MIN}–${PRICE_BOARD_MAX} in steps of $
+          {PRICE_BOARD_STEP}.
+        </p>
+      </div>
+
+      <div className="price-scale" aria-hidden="true">
+        <div className="price-scale-track">
+          {ticks.map((tick) => {
+            const left = ((tick - PRICE_BOARD_MIN) / span) * 100;
+            const major = tick === PRICE_BOARD_MIN || tick === PRICE_BOARD_MAX || tick % 50 === 0;
+            return (
+              <span
+                key={tick}
+                className={major ? "tick major" : "tick"}
+                style={{ left: `${left}%` }}
+              >
+                {major ? tick : null}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       <ul className="price-diagram">
@@ -114,7 +143,7 @@ function MarketDiagram({
               <span className="price-name">{COMPANY_LABEL[company]}</span>
               <span className="price-value">${state.prices[company]}</span>
             </div>
-            <div className="bar-track" aria-hidden="true">
+            <div className="bar-track">
               <div
                 className="bar-fill"
                 style={{ width: `${bars[company]}%` }}
