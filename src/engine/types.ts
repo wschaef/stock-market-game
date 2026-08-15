@@ -10,7 +10,6 @@ export const COMPANY_LABEL: Record<Company, string> = {
 
 export const STARTING_PRICE = 100;
 export const STARTING_CASH = 1000;
-export const BANK_SHARES = 40;
 export const STARTING_HAND = 4;
 export const ACTIONS_PER_PLAYER_IN_PILE = 6;
 export const RISKS_PER_PLAYER_IN_PILE = 3;
@@ -67,7 +66,6 @@ export type GameState = {
   players: Player[]
   currentPlayerIndex: number
   prices: Record<Company, number>
-  bankShares: Record<Company, number>
   drawPile: Card[]
   discardPile: Card[]
   unusedCards: Card[]

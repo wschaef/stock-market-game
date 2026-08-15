@@ -16,12 +16,12 @@ These replace physical-board ambiguities for the browser port.
 - **No trade after an Action play.** Trading is allowed only on a Trade-only turn or after a Risk. This is the core of the game.
 - **`[?]`:** the current player selects which company gets that effect. The named company on the card is already fixed, so the pick is one of the **other three**.
 - **Prices** are integers. After each company’s effect:
-  - If **target > 250** (split): new price = **floor(target / 2)**; **each shareholder’s** shares of that company **double**. Bank unsold certificates do **not** double. Repeat until price ≤ 250. **250** is legal (no split).
-  - If **target < 10** (wipeout): all player shares of that company are **lost** (no cash); bank supply of that company resets to **40**; price resets to **100**. **10** is legal (no wipeout).
+  - If **target > 250** (split): new price = **floor(target / 2)**; **each shareholder’s** shares of that company **double**. Repeat until price ≤ 250. **250** is legal (no split).
+  - If **target < 10** (wipeout): all player shares of that company are **lost** (no cash); price resets to **100**. **10** is legal (no wipeout).
   - Otherwise the price becomes the target.
 - Multiplier **1/2** uses integer **floor**, then the split/wipeout checks.
 - Effects on a card apply **per company independently**. Risk cards that omit a company treat it as **+0**.
-- **Bank:** 40 shares per company at setup. Cannot buy more than the bank holds, sell more than you hold, or spend more cash than you have.
+- **Trading:** share supply is unlimited. Cannot sell more than you hold or spend more cash than you have.
 - **End:** finish resolving the card that emptied the draw pile (including optional post-Risk trade), then score  
   `net worth = sum(shares[company] × price[company]) + cash`. Highest wins; ties allowed.
 

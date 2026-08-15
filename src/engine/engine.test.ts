@@ -4,7 +4,6 @@ import { applyCompanyTarget, netWorth, ranking } from "./price";
 import { identityShuffle, setupGame } from "./setup";
 import { allowedChoices, reduce } from "./turn";
 import {
-  BANK_SHARES,
   COMPANIES,
   type Card,
   type GameState,
@@ -28,12 +27,6 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     players: [player("Ada"), player("Bob")],
     currentPlayerIndex: 0,
     prices: { commerzbank: 100, bayer: 100, bmw: 100, bp: 100 },
-    bankShares: {
-      commerzbank: BANK_SHARES,
-      bayer: BANK_SHARES,
-      bmw: BANK_SHARES,
-      bp: BANK_SHARES,
-    },
     drawPile: [],
     discardPile: [],
     unusedCards: [],
@@ -110,7 +103,7 @@ describe("setup", () => {
 });
 
 describe("split and wipeout", () => {
-  it("splits when target is above 250: price = floor(target/2), shareholder shares double, bank unchanged", () => {
+  it("splits when target is above 250: price = floor(target/2), shareholder shares double", () => {
     const state = testState({
       prices: { commerzbank: 200, bayer: 100, bmw: 100, bp: 100 },
     });
@@ -120,7 +113,6 @@ describe("split and wipeout", () => {
     expect(state.prices.commerzbank).toBe(150);
     expect(state.players[0].shares.commerzbank).toBe(10);
     expect(state.players[1].shares.commerzbank).toBe(6);
-    expect(state.bankShares.commerzbank).toBe(40);
     expect(events[0]).toMatchObject({ type: "split", newPrice: 150, target: 300 });
   });
 
@@ -132,22 +124,14 @@ describe("split and wipeout", () => {
     expect(state.players[0].shares.bayer).toBe(4);
   });
 
-  it("wipes out when target is below 10: holdings gone, bank 40, price 100", () => {
-    const state = testState({
-      bankShares: {
-        commerzbank: 40,
-        bayer: 12,
-        bmw: 40,
-        bp: 40,
-      },
-    });
+  it("wipes out when target is below 10: holdings gone, price 100", () => {
+    const state = testState();
     state.players[0].shares.bayer = 8;
     state.players[1].shares.bayer = 20;
     const events = applyCompanyTarget(state, "bayer", 5);
     expect(state.prices.bayer).toBe(100);
     expect(state.players[0].shares.bayer).toBe(0);
     expect(state.players[1].shares.bayer).toBe(0);
-    expect(state.bankShares.bayer).toBe(40);
     expect(events[0]).toMatchObject({ type: "wipeout", target: 5 });
   });
 
@@ -209,7 +193,6 @@ describe("draw and play", () => {
     expect(bought.ok).toBe(true);
     expect(bought.state.players[0].shares.commerzbank).toBe(2);
     expect(bought.state.players[0].cash).toBe(1000 - 220);
-    expect(bought.state.bankShares.commerzbank).toBe(38);
   });
 
   it("lets the player pick [?] as one of the other three companies", () => {
@@ -287,7 +270,7 @@ describe("draw and play", () => {
 });
 
 describe("trade validation", () => {
-  it("rejects overspend, oversell, and buying more than the bank holds", () => {
+  it("rejects overspend and oversell, but allows unlimited share supply", () => {
     const state = testState({ phase: "optionalTrade" });
     state.players[0].cash = 50;
     state.prices.bmw = 100;
@@ -296,10 +279,10 @@ describe("trade validation", () => {
     ).toBe(false);
 
     const rich = testState({ phase: "optionalTrade" });
-    rich.bankShares.bmw = 0;
-    expect(
-      reduce(rich, { type: "buy", company: "bmw", quantity: 1 }).error,
-    ).toMatch(/bank/i);
+    rich.players[0].cash = 50_000;
+    const bulk = reduce(rich, { type: "buy", company: "bmw", quantity: 100 });
+    expect(bulk.ok).toBe(true);
+    expect(bulk.state.players[0].shares.bmw).toBe(100);
 
     const holder = testState({ phase: "optionalTrade" });
     expect(

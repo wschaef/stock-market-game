@@ -1,5 +1,5 @@
 import { ACTION_CARDS, RISK_CARDS } from "./catalog";
-import { fullBankShares, zeroShares } from "./price";
+import { zeroShares } from "./price";
 import {
   ACTIONS_PER_PLAYER_IN_PILE,
   MAX_PLAYERS,
@@ -63,7 +63,6 @@ export function setupGame(
       bmw: STARTING_PRICE,
       bp: STARTING_PRICE,
     },
-    bankShares: fullBankShares(),
     drawPile,
     discardPile: [],
     unusedCards,

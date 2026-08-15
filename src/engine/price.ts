@@ -1,5 +1,4 @@
 import {
-  BANK_SHARES,
   COMPANIES,
   SPLIT_ABOVE,
   WIPEOUT_BELOW,
@@ -15,15 +14,6 @@ function emptyShares(): Record<Company, number> {
 
 export function zeroShares(): Record<Company, number> {
   return emptyShares();
-}
-
-export function fullBankShares(): Record<Company, number> {
-  return {
-    commerzbank: BANK_SHARES,
-    bayer: BANK_SHARES,
-    bmw: BANK_SHARES,
-    bp: BANK_SHARES,
-  };
 }
 
 export function applyCompanyTarget(
@@ -59,7 +49,6 @@ export function applyCompanyTarget(
     for (const player of state.players) {
       player.shares[company] = 0;
     }
-    state.bankShares[company] = BANK_SHARES;
     state.prices[company] = 100;
     events.push({ type: "wipeout", company, target });
     return events;
