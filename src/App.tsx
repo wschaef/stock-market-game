@@ -120,12 +120,9 @@ function MarketDiagram({
                 style={{ width: `${bars[company]}%` }}
               />
             </div>
-            <div className="price-stats">
-              <span>You {player.shares[company]}</span>
-              <span>Bank {state.bankShares[company]}</span>
-            </div>
             {trading ? (
               <div className="share-trade">
+                <span className="held">You hold {player.shares[company]}</span>
                 <button type="button" onClick={() => onBuy(company)}>
                   Buy
                 </button>

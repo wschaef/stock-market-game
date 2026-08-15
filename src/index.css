@@ -247,7 +247,6 @@ h2 {
 }
 
 .price-meta,
-.price-stats,
 .share-trade,
 .trade-toolbar,
 .action-row {
@@ -271,7 +270,7 @@ h2 {
 }
 
 .bar-track {
-  height: 14px;
+  height: 18px;
   border-radius: 999px;
   background: rgba(19, 32, 51, 0.08);
   overflow: hidden;
@@ -297,14 +296,15 @@ h2 {
   background: var(--bp);
 }
 
-.price-stats {
+.share-trade {
+  margin-top: 0.15rem;
+}
+
+.share-trade .held {
   color: var(--muted);
   font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
-}
-
-.share-trade {
-  margin-top: 0.15rem;
+  margin-right: 0.25rem;
 }
 
 .trade-toolbar {

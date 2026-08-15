@@ -100,15 +100,11 @@ function trade(state: GameState, company: Company, quantity: number, side: "buy"
   const price = state.prices[company];
   const cost = price * quantity;
   if (side === "buy") {
-    if (quantity > state.bankShares[company]) {
-      return "The bank does not have that many shares.";
-    }
     if (cost > player.cash) {
       return "Not enough cash.";
     }
     player.cash -= cost;
     player.shares[company] += quantity;
-    state.bankShares[company] -= quantity;
     return null;
   }
   if (quantity > player.shares[company]) {
@@ -116,7 +112,6 @@ function trade(state: GameState, company: Company, quantity: number, side: "buy"
   }
   player.shares[company] -= quantity;
   player.cash += cost;
-  state.bankShares[company] += quantity;
   return null;
 }
 
