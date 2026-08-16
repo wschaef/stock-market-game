@@ -6,12 +6,14 @@ This file is the rules source for the digital game. The **Digital rules** sectio
 
 These replace physical-board ambiguities for the browser port.
 
-- **Players:** 2–4, hotseat, clockwise, player 1 starts.
+- **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Investor / Raider / Mixed). AI is deterministic (no LLM) and may take any legal action a human can.
 - **Money:** integer dollars. Each player starts with **$1,000**. Note denominations are unused on screen.
 - **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (6 per player).
 - **Risk cards:** Only in the draw pile mix (3 per player). Leftover cards after dealing/pile construction are unused.
+- **Rounds:** A **round** is one full table cycle (every seat takes one turn). The game lasts a chosen number of rounds (**default 10**, min 1, max 50). After the last seat finishes the final round (including optional post-Risk trade), the game ends.
+- **Card recycle:** When a card is **played** (Action from hand or Risk from the draw), it is inserted at a **random position** in the remaining draw pile. The next draw is the new top of that pile.
 - **Turn choice:** **Draw** or **Trade only**.
-  - **Draw:** reveal the top card. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell.
+  - **Draw:** reveal the top card. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell. If the draw pile is empty, Draw is not allowed (Trade only).
   - **Trade only:** no draw; buy and/or sell at current prices.
 - **No trade after an Action play.** Trading is allowed only on a Trade-only turn or after a Risk. This is the core of the game.
 - **`[?]`:** the current player selects which company gets that effect. The named company on the card is already fixed, so the pick is one of the **other three**.
@@ -22,7 +24,7 @@ These replace physical-board ambiguities for the browser port.
 - Multiplier **1/2** uses integer **floor**, then the split/wipeout checks.
 - Effects on a card apply **per company independently**. Risk cards that omit a company treat it as **+0**.
 - **Trading:** share supply is unlimited. Cannot sell more than you hold or spend more cash than you have.
-- **End:** finish resolving the card that emptied the draw pile (including optional post-Risk trade), then score  
+- **End:** when the configured rounds are complete, score  
   `net worth = sum(shares[company] × price[company]) + cash`. Highest wins; ties allowed.
 
 ---

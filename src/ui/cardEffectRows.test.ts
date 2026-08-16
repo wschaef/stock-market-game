@@ -37,7 +37,24 @@ describe("cardEffectRows", () => {
     ]);
   });
 
-  it("maps +100 style into one row per company", () => {
+  it("puts the positive effect before a leading negative op", () => {
+    const card: Card = {
+      id: "std-neg-first",
+      kind: "action",
+      title: "-30 BP / +60 [?]",
+      text: "",
+      ops: [
+        { type: "delta", company: "bp", amount: -30 },
+        { type: "deltaChoice", amount: 60 },
+      ],
+    };
+    expect(cardEffectRows(card)).toEqual([
+      { kind: "delta", amount: 60, company: null },
+      { kind: "delta", amount: -30, company: "bp" },
+    ]);
+  });
+
+  it("maps +100 style into one row per company with the gain first", () => {
     const card: Card = {
       id: "p100",
       kind: "action",

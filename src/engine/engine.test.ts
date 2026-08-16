@@ -21,6 +21,8 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     cash: 1000,
     shares: emptyShares(),
     hand: [],
+    controller: "human",
+    strategy: null,
     ...extra,
   });
   return {
@@ -35,6 +37,10 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     lastEvents: [],
     lastDrawn: null,
     lastError: null,
+    roundsTotal: 10,
+    roundsCompleted: 0,
+    log: [],
+    random: () => 0,
     ...overrides,
   };
 }
@@ -155,6 +161,8 @@ describe("draw and play", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [actionWithChoice],
+          controller: "human",
+          strategy: null,
         },
         {
           id: "p2",
@@ -162,6 +170,8 @@ describe("draw and play", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [],
+          controller: "human",
+          strategy: null,
         },
       ],
     });
@@ -206,6 +216,8 @@ describe("draw and play", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [actionWithChoice],
+          controller: "human",
+          strategy: null,
         },
         {
           id: "p2",
@@ -213,6 +225,8 @@ describe("draw and play", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [],
+          controller: "human",
+          strategy: null,
         },
       ],
     });
@@ -246,6 +260,8 @@ describe("draw and play", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [actionNoChoice],
+          controller: "human",
+          strategy: null,
         },
         {
           id: "p2",
@@ -253,6 +269,8 @@ describe("draw and play", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [],
+          controller: "human",
+          strategy: null,
         },
       ],
     });
@@ -302,9 +320,10 @@ describe("scoring and end", () => {
     expect(netWorth(state, 0)).toBe(400 + 240 + 80);
   });
 
-  it("ends after the emptying draw is fully resolved", () => {
+  it("ends after the configured number of full table rounds", () => {
     const state = testState({
-      drawPile: [actionNoChoice],
+      roundsTotal: 1,
+      phase: "optionalTrade",
       players: [
         {
           id: "p1",
@@ -312,6 +331,8 @@ describe("scoring and end", () => {
           cash: 1000,
           shares: emptyShares(),
           hand: [],
+          controller: "human",
+          strategy: null,
         },
         {
           id: "p2",
@@ -319,17 +340,87 @@ describe("scoring and end", () => {
           cash: 500,
           shares: emptyShares(),
           hand: [],
+          controller: "human",
+          strategy: null,
         },
       ],
     });
-    const drawn = reduce(state, { type: "draw" });
-    const played = reduce(drawn.state, {
-      type: "playCard",
-      cardId: "p100-test",
-    });
-    expect(played.state.phase).toBe("gameOver");
-    const board = ranking(played.state);
+    const afterAda = reduce(state, { type: "endTrade" });
+    expect(afterAda.state.phase).toBe("chooseTurn");
+    expect(afterAda.state.currentPlayerIndex).toBe(1);
+    expect(afterAda.state.roundsCompleted).toBe(0);
+
+    const bobTrade = reduce(afterAda.state, { type: "startTrade" });
+    expect(bobTrade.ok).toBe(true);
+    const afterBob = reduce(bobTrade.state, { type: "endTrade" });
+    expect(afterBob.state.roundsCompleted).toBe(1);
+    expect(afterBob.state.phase).toBe("gameOver");
+    const board = ranking(afterBob.state);
     expect(board[0].name).toBe("Ada");
     expect(board[0].netWorth).toBeGreaterThan(board[1].netWorth);
+  });
+
+  it("rejects draw when the pile is empty", () => {
+    const state = testState({ drawPile: [] });
+    const drawn = reduce(state, { type: "draw" });
+    expect(drawn.ok).toBe(false);
+    expect(drawn.error).toMatch(/empty/i);
+  });
+});
+
+describe("card recycle", () => {
+  it("re-inserts a played Action at a random draw-pile index", () => {
+    const other: Card = {
+      id: "other",
+      kind: "action",
+      title: "other",
+      text: "",
+      ops: [{ type: "delta", company: "bmw", amount: 10 }],
+    };
+    // random → 0.99 ⇒ insert index = floor(0.99 * 2) = 1 among 1 remaining + slot
+    const state = testState({
+      phase: "chooseHandCard",
+      drawPile: [other],
+      random: () => 0.99,
+      players: [
+        {
+          id: "p1",
+          name: "Ada",
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [actionNoChoice],
+          controller: "human",
+          strategy: null,
+        },
+        {
+          id: "p2",
+          name: "Bob",
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [],
+          controller: "human",
+          strategy: null,
+        },
+      ],
+    });
+    const played = reduce(state, { type: "playCard", cardId: "p100-test" });
+    expect(played.ok).toBe(true);
+    expect(played.state.discardPile).toHaveLength(0);
+    expect(played.state.drawPile).toHaveLength(2);
+    expect(played.state.drawPile.map((c) => c.id)).toEqual([
+      "other",
+      "p100-test",
+    ]);
+  });
+
+  it("re-inserts a resolved Risk into the draw pile", () => {
+    const state = testState({
+      drawPile: [riskNoChoice],
+      random: () => 0,
+    });
+    const drawn = reduce(state, { type: "draw" });
+    expect(drawn.ok).toBe(true);
+    expect(drawn.state.phase).toBe("optionalTrade");
+    expect(drawn.state.drawPile.map((c) => c.id)).toEqual(["risk-test"]);
   });
 });

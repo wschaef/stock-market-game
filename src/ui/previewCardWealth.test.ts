@@ -14,6 +14,8 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     cash: 1000,
     shares: emptyShares(),
     hand: [],
+    controller: "human",
+    strategy: null,
     ...extra,
   });
   return {
@@ -28,6 +30,10 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     lastEvents: [],
     lastDrawn: null,
     lastError: null,
+    roundsTotal: 10,
+    roundsCompleted: 0,
+    log: [],
+    random: () => 0,
     ...overrides,
   };
 }
@@ -92,9 +98,16 @@ describe("previewCardWealth", () => {
   it("does not mutate the live game state", () => {
     const state = testState();
     state.players[0].shares.bmw = 3;
-    const before = structuredClone(state);
+    const before = structuredClone({
+      ...state,
+      random: undefined,
+    });
     previewCardWealth(state, namedRise);
-    expect(state).toEqual(before);
+    const after = structuredClone({
+      ...state,
+      random: undefined,
+    });
+    expect(after).toEqual(before);
   });
 
   it("returns min–max deltas across allowed [? ] choices", () => {
