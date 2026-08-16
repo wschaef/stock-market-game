@@ -7,14 +7,12 @@ import {
   ranking,
   reduce,
   setupGame,
+  type Card,
   type Company,
   type GameState,
 } from "./engine";
 import {
-  PRICE_BOARD_MAX,
-  PRICE_BOARD_MIN,
-  PRICE_BOARD_STEP,
-  priceBoardPercents,
+  priceBoardFilledCount,
   priceBoardTicks,
 } from "./ui/relativeBars";
 
@@ -36,6 +34,60 @@ function eventText(state: GameState): string[] {
     }
     return `${name}: ${event.from} → ${event.to}`;
   });
+}
+
+function CardTitle({ title, text }: { title: string; text: string }) {
+  const parts = title.split(/(\[\?\])/);
+  const hasChoice = title.includes("[?]");
+  return (
+    <span className="card-title">
+      {parts.map((part, index) =>
+        part === "[?]" ? (
+          <abbr key={index} className="card-hint" title={text}>
+            ?
+          </abbr>
+        ) : (
+          <span key={index}>{part}</span>
+        ),
+      )}
+      {!hasChoice && text ? (
+        <abbr className="card-hint" title={text}>
+          ?
+        </abbr>
+      ) : null}
+    </span>
+  );
+}
+
+function CardFace({
+  card,
+  playable,
+  onPlay,
+}: {
+  card: Card
+  playable: boolean
+  onPlay: (cardId: string) => void
+}) {
+  const body = (
+    <>
+      <CardTitle title={card.title} text={card.text} />
+      <span className="card-kind">{card.kind}</span>
+    </>
+  );
+
+  if (playable) {
+    return (
+      <button
+        type="button"
+        className="card"
+        onClick={() => onPlay(card.id)}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return <article className="card">{body}</article>;
 }
 
 function Setup({ onStart }: { onStart: (names: string[]) => void }) {
@@ -103,69 +155,67 @@ function MarketDiagram({
   onEndTrade: () => void
 }) {
   const player = state.players[state.currentPlayerIndex];
-  const bars = priceBoardPercents(state.prices);
+  const others = state.players.filter((_, i) => i !== state.currentPlayerIndex);
   const ticks = priceBoardTicks();
   const trading = canTrade(state);
-  const span = PRICE_BOARD_MAX - PRICE_BOARD_MIN;
 
   return (
     <section className="market-panel" aria-label="Share prices">
       <div className="section-head">
         <h2>Share prices</h2>
-        <p>
-          Board scale ${PRICE_BOARD_MIN}–${PRICE_BOARD_MAX} in steps of $
-          {PRICE_BOARD_STEP}.
-        </p>
-      </div>
-
-      <div className="price-scale" aria-hidden="true">
-        <div className="price-scale-track">
-          {ticks.map((tick) => {
-            const left = ((tick - PRICE_BOARD_MIN) / span) * 100;
-            const major = tick === PRICE_BOARD_MIN || tick === PRICE_BOARD_MAX || tick % 50 === 0;
-            return (
-              <span
-                key={tick}
-                className={major ? "tick major" : "tick"}
-                style={{ left: `${left}%` }}
-              >
-                {major ? tick : null}
-              </span>
-            );
-          })}
-        </div>
       </div>
 
       <ul className="price-diagram">
-        {COMPANIES.map((company) => (
-          <li className={`price-row ${COMPANY_TONE[company]}`} key={company}>
-            <div className="price-meta">
-              <span className="price-name">{COMPANY_LABEL[company]}</span>
-              <span className="price-value">${state.prices[company]}</span>
-            </div>
-            <div className="bar-track">
-              <div
-                className="bar-fill"
-                style={{ width: `${bars[company]}%` }}
-              />
-            </div>
-            {trading ? (
-              <div className="share-trade">
-                <span className="held">You hold {player.shares[company]}</span>
-                <button type="button" onClick={() => onBuy(company)}>
-                  Buy
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => onSell(company)}
-                >
-                  Sell
-                </button>
+        {COMPANIES.map((company) => {
+          const filled = priceBoardFilledCount(state.prices[company]);
+          return (
+            <li className={`price-row ${COMPANY_TONE[company]}`} key={company}>
+              <div className="price-meta">
+                <span className="price-name">{COMPANY_LABEL[company]}</span>
+                <span className="price-value">${state.prices[company]}</span>
               </div>
-            ) : null}
-          </li>
-        ))}
+              <div
+                className="bar-track"
+                role="img"
+                aria-label={`${COMPANY_LABEL[company]} at ${state.prices[company]}`}
+              >
+                {ticks.map((tick, index) => (
+                  <span
+                    key={tick}
+                    className={
+                      index < filled ? "piece filled" : "piece"
+                    }
+                    title={`$${tick}`}
+                  />
+                ))}
+              </div>
+              <div className="owners">
+                <span>
+                  You {player.shares[company]}
+                </span>
+                {others.map((other) => (
+                  <span key={other.id}>
+                    {other.name} {other.shares[company]}
+                  </span>
+                ))}
+              </div>
+              {trading ? (
+                <div className="share-trade">
+                  <button type="button" onClick={() => onBuy(company)}>
+                    Buy
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => onSell(company)}
+                  >
+                    Sell
+                  </button>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
 
       {trading ? (
@@ -202,31 +252,16 @@ function Hand({
     <section className="hand-panel" aria-label="Your cards">
       <div className="section-head">
         <h2>Your cards</h2>
-        <p>
-          {playable
-            ? "Pick one card to play."
-            : "Visible for your whole turn — playable after you draw an Action."}
-        </p>
       </div>
       <div className={`hand ${playable ? "hand-playable" : "hand-readonly"}`}>
-        {player.hand.map((card) =>
-          playable ? (
-            <button
-              type="button"
-              className="card"
-              key={card.id}
-              onClick={() => onPlay(card.id)}
-            >
-              <strong>{card.title}</strong>
-              <small>{card.text}</small>
-            </button>
-          ) : (
-            <article className="card" key={card.id}>
-              <strong>{card.title}</strong>
-              <small>{card.text}</small>
-            </article>
-          ),
-        )}
+        {player.hand.map((card) => (
+          <CardFace
+            key={card.id}
+            card={card}
+            playable={playable}
+            onPlay={onPlay}
+          />
+        ))}
       </div>
     </section>
   );
@@ -249,14 +284,6 @@ function Board({
     setState(reduce(state, intent).state);
   }
 
-  const phaseHelp = {
-    chooseTurn: "Draw a card, or Trade only (no draw).",
-    chooseHandCard: "Play one of your five cards. You cannot trade after this.",
-    chooseCompany: "Choose which company gets [?].",
-    optionalTrade: "Buy and/or sell on the share rows, then end the turn.",
-    gameOver: "Draw pile is empty. Highest net worth wins.",
-  }[state.phase];
-
   return (
     <div className="shell board-shell">
       <header className="top-bar">
@@ -275,7 +302,6 @@ function Board({
         </div>
       ) : null}
 
-      <p className="phase-help">{phaseHelp}</p>
       {state.lastError ? <p className="error">{state.lastError}</p> : null}
       {eventText(state).map((line) => (
         <p className="event" key={line}>
@@ -285,7 +311,6 @@ function Board({
       {state.lastDrawn ? (
         <p className="drawn">
           Last drawn: <strong>{state.lastDrawn.title}</strong>
-          {state.lastDrawn.text ? ` — ${state.lastDrawn.text}` : ""}
         </p>
       ) : null}
 
@@ -343,14 +368,14 @@ function Board({
       {others.length > 0 && state.phase !== "gameOver" ? (
         <section className="others-panel" aria-label="Other players">
           <div className="section-head">
-            <h2>Waiting</h2>
+            <h2>Other players</h2>
           </div>
           <ul className="others-list">
             {others.map((p) => (
               <li key={p.id}>
                 <strong>{p.name}</strong>
                 <span>${p.cash}</span>
-                <span>
+                <span className="others-shares">
                   {COMPANIES.map(
                     (c) => `${COMPANY_LABEL[c]} ${p.shares[c]}`,
                   ).join(" · ")}

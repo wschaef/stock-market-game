@@ -10,6 +10,7 @@ export { allowedChoices, canTrade, reduce } from "./turn";
 export {
   COMPANY_LABEL,
   COMPANIES,
+  type Card,
   type Company,
   type GameState,
   type Intent,
