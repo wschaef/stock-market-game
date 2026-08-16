@@ -81,10 +81,31 @@ describe("catalog", () => {
     expect(RISK_CARDS).toHaveLength(15);
     expect(ALL_CARDS).toHaveLength(63);
   });
+
+  it("has two +100 copies per company with −10/−20/−30 choices", () => {
+    const p100 = ACTION_CARDS.filter((card) => card.id.startsWith("p100-"));
+    expect(p100).toHaveLength(8);
+    for (const company of COMPANIES) {
+      const copies = p100.filter((card) => card.id.startsWith(`p100-${company}-`));
+      expect(copies).toHaveLength(2);
+      for (const card of copies) {
+        expect(card.ops[0]).toEqual({
+          type: "delta",
+          company,
+          amount: 100,
+        });
+        expect(card.ops.slice(1)).toEqual([
+          { type: "deltaChoice", amount: -10 },
+          { type: "deltaChoice", amount: -20 },
+          { type: "deltaChoice", amount: -30 },
+        ]);
+      }
+    }
+  });
 });
 
 describe("setup", () => {
-  it("deals 4 action cards each and builds 6 action + 3 risk per player", () => {
+  it("deals 4 action cards each and builds 9 action + 3 risk per player", () => {
     const state = setupGame(["Ada", "Bob"], identityShuffle);
     expect(state.players).toHaveLength(2);
     expect(state.players.every((p) => p.cash === 1000)).toBe(true);
@@ -92,13 +113,25 @@ describe("setup", () => {
     expect(state.players.every((p) => p.hand.every((c) => c.kind === "action"))).toBe(
       true,
     );
-    expect(state.drawPile).toHaveLength(18);
+    expect(state.drawPile).toHaveLength(24);
     const pileActions = state.drawPile.filter((c) => c.kind === "action");
     const pileRisks = state.drawPile.filter((c) => c.kind === "risk");
-    expect(pileActions).toHaveLength(12);
+    expect(pileActions).toHaveLength(18);
     expect(pileRisks).toHaveLength(6);
-    expect(state.unusedCards).toHaveLength(63 - 8 - 18);
+    expect(state.unusedCards).toHaveLength(63 - 8 - 24);
     expect(state.phase).toBe("chooseTurn");
+  });
+
+  it("for 4 players puts all leftover actions in the pile (32) with 12 risks", () => {
+    const state = setupGame(["Ada", "Bob", "Cara", "Dan"], identityShuffle);
+    expect(state.players.every((p) => p.hand.length === 4)).toBe(true);
+    const pileActions = state.drawPile.filter((c) => c.kind === "action");
+    const pileRisks = state.drawPile.filter((c) => c.kind === "risk");
+    expect(pileActions).toHaveLength(32);
+    expect(pileRisks).toHaveLength(12);
+    expect(state.drawPile).toHaveLength(44);
+    expect(state.unusedCards.filter((c) => c.kind === "action")).toHaveLength(0);
+    expect(state.unusedCards.filter((c) => c.kind === "risk")).toHaveLength(3);
   });
 });
 
@@ -233,6 +266,59 @@ describe("draw and play", () => {
     expect(picked.state.prices.bmw).toBe(40);
     expect(picked.state.phase).toBe("chooseTurn");
     expect(picked.state.currentPlayerIndex).toBe(1);
+  });
+
+  it("assigns −10/−20/−30 on a +100 card across three distinct other companies", () => {
+    const p100: Card = {
+      id: "p100-play",
+      kind: "action",
+      title: "+100",
+      text: "",
+      ops: [
+        { type: "delta", company: "commerzbank", amount: 100 },
+        { type: "deltaChoice", amount: -10 },
+        { type: "deltaChoice", amount: -20 },
+        { type: "deltaChoice", amount: -30 },
+      ],
+    };
+    const state = testState({
+      phase: "chooseHandCard",
+      drawPile: [riskNoChoice],
+      players: [
+        {
+          id: "p1",
+          name: "Ada",
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [p100],
+        },
+        {
+          id: "p2",
+          name: "Bob",
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [],
+        },
+      ],
+    });
+    const played = reduce(state, { type: "playCard", cardId: "p100-play" });
+    expect(played.state.phase).toBe("chooseCompany");
+    const first = reduce(played.state, { type: "chooseCompany", company: "bayer" });
+    expect(first.ok).toBe(true);
+    expect(first.state.phase).toBe("chooseCompany");
+    expect(first.state.prices.commerzbank).toBe(100);
+    const dup = reduce(first.state, { type: "chooseCompany", company: "bayer" });
+    expect(dup.ok).toBe(false);
+    const second = reduce(first.state, { type: "chooseCompany", company: "bmw" });
+    expect(second.state.phase).toBe("chooseCompany");
+    const third = reduce(second.state, { type: "chooseCompany", company: "bp" });
+    expect(third.ok).toBe(true);
+    expect(third.state.prices.commerzbank).toBe(200);
+    expect(third.state.prices.bayer).toBe(90);
+    expect(third.state.prices.bmw).toBe(80);
+    expect(third.state.prices.bp).toBe(70);
+    expect(third.state.phase).toBe("chooseTurn");
+    expect(third.state.currentPlayerIndex).toBe(1);
   });
 
   it("rejects trade after a completed Action play", () => {

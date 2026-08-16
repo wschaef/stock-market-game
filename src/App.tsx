@@ -5,6 +5,7 @@ import {
   allowedChoices,
   canTrade,
   netWorth,
+  nextChoicePrompt,
   ranking,
   reduce,
   setupGame,
@@ -520,7 +521,7 @@ function Board({
       {state.phase === "chooseCompany" && state.pendingCard ? (
         <section className="picker-panel">
           <div className="section-head">
-            <h2>Choose company</h2>
+            <h2>{nextChoicePrompt(state.pendingCard)}</h2>
             <p>{state.pendingCard.text || state.pendingCard.title}</p>
           </div>
           <div className="action-row picker-row">

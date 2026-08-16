@@ -6,7 +6,7 @@ export {
 } from "./catalog";
 export { applyCompanyTarget, netWorth, ranking } from "./price";
 export { identityShuffle, setupGame } from "./setup";
-export { allowedChoices, canTrade, reduce } from "./turn";
+export { allowedChoices, canTrade, nextChoicePrompt, reduce } from "./turn";
 export {
   COMPANY_LABEL,
   COMPANIES,

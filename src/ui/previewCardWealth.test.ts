@@ -160,6 +160,28 @@ describe("previewCardWealth", () => {
     );
     expect(preview.players[0].deltaMin).not.toBe(preview.players[0].deltaMax);
   });
+
+  it("spans permutations for +100 multi-penalty cards", () => {
+    const p100: Card = {
+      id: "p100-multi",
+      kind: "action",
+      title: "+100 CB",
+      text: "",
+      ops: [
+        { type: "delta", company: "commerzbank", amount: 100 },
+        { type: "deltaChoice", amount: -10 },
+        { type: "deltaChoice", amount: -20 },
+        { type: "deltaChoice", amount: -30 },
+      ],
+    };
+    const state = testState();
+    state.players[0].shares.bayer = 1;
+    const preview = previewCardWealth(state, p100);
+    expect(preview.dependsOnChoice).toBe(true);
+    // Bayer can receive −10, −20, or −30 → wealth −10/−20/−30; named +100 unused
+    expect(preview.players[0].deltaMin).toBe(-30);
+    expect(preview.players[0].deltaMax).toBe(-10);
+  });
 });
 
 describe("companies constant still four", () => {
