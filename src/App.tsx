@@ -112,7 +112,6 @@ function EffectRows({ card }: { card: Card }) {
     <ul className="effect-rows">
       {rows.map((row, index) => (
         <li key={index} className="effect-row">
-          <EffectMagnitude row={row} />
           {row.company ? (
             <CompanyMark company={row.company} size="sm" />
           ) : (
@@ -120,6 +119,7 @@ function EffectRows({ card }: { card: Card }) {
               ?
             </span>
           )}
+          <EffectMagnitude row={row} />
         </li>
       ))}
     </ul>

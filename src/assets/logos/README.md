@@ -2,10 +2,10 @@
 
 Used for in-game identification of Börsenspiel share companies.
 
-| File | Source |
+| File | Notes |
 | --- | --- |
 | `bmw.svg` | Wikimedia Commons: [BMW.svg](https://commons.wikimedia.org/wiki/File:BMW.svg) |
-| `bayer.svg` | Wikimedia Commons: [Logo Bayer.svg](https://commons.wikimedia.org/wiki/File:Logo_Bayer.svg) |
+| `bayer.svg` | Simplified cross-in-circle mark (readable at small UI sizes) |
 | `bp.svg` | Wikimedia Commons: [Bp logo89.svg](https://commons.wikimedia.org/wiki/File:Bp_logo89.svg) |
 | `commerzbank.svg` | [Simple Icons](https://simpleicons.org/) (CC0) Commerzbank glyph |
 
