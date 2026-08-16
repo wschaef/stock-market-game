@@ -1,5 +1,6 @@
 import { applyNamedOps } from "./price";
 import {
+  COMPANY_LABEL,
   COMPANIES,
   type Card,
   type CardOp,
@@ -17,7 +18,10 @@ export type ReduceResult = {
 };
 
 function cloneState(state: GameState): GameState {
-  return structuredClone(state);
+  const { random, ...rest } = state;
+  const next = structuredClone(rest) as GameState;
+  next.random = random;
+  return next;
 }
 
 function fail(state: GameState, error: string): ReduceResult {
@@ -98,23 +102,53 @@ export function bindNextChoice(card: Card, company: Company): Card | string {
   return { ...card, ops };
 }
 
+export function insertAtRandom(
+  pile: Card[],
+  card: Card,
+  random: () => number,
+): number {
+  const index = Math.floor(random() * (pile.length + 1));
+  pile.splice(index, 0, card);
+  return index;
+}
+
+function appendLog(state: GameState, text: string): void {
+  state.log.push({ id: state.log.length, text });
+}
+
 function advanceTurn(state: GameState): void {
   state.pendingCard = null;
-  if (state.drawPile.length === 0) {
-    state.phase = "gameOver";
-    return;
+  const finishedIndex = state.currentPlayerIndex;
+  const completedRound = finishedIndex === state.players.length - 1;
+  if (completedRound) {
+    state.roundsCompleted += 1;
+    appendLog(
+      state,
+      `Round ${state.roundsCompleted} of ${state.roundsTotal} complete`,
+    );
+    if (state.roundsCompleted >= state.roundsTotal) {
+      state.phase = "gameOver";
+      appendLog(state, "Game over");
+      return;
+    }
   }
   state.currentPlayerIndex =
     (state.currentPlayerIndex + 1) % state.players.length;
   state.phase = "chooseTurn";
+  const next = currentPlayer(state);
+  appendLog(
+    state,
+    `Turn → ${next.name}${next.controller === "ai" ? ` (AI ${next.strategy ?? "wealth"})` : ""}`,
+  );
 }
 
+/** Apply a fully-bound card and recycle it into the draw pile. */
 function applyResolvedCard(state: GameState, card: Card): void {
   if (hasChoice(card.ops)) {
     throw new Error("Card still has unbound company choices.");
   }
   state.lastEvents = applyNamedOps(state, card.ops as NamedOp[]);
-  state.discardPile.push(card);
+  insertAtRandom(state.drawPile, card, state.random);
   state.pendingCard = null;
 }
 
@@ -148,6 +182,35 @@ function trade(state: GameState, company: Company, quantity: number, side: "buy"
   return null;
 }
 
+function describeIntent(state: GameState, intent: Intent): string {
+  const actor = currentPlayer(state).name;
+  switch (intent.type) {
+    case "draw":
+      return `${actor} draws`;
+    case "startTrade":
+      return `${actor} starts trade`;
+    case "playCard": {
+      const card =
+        state.pendingCard?.id === intent.cardId
+          ? state.pendingCard
+          : currentPlayer(state).hand.find((c) => c.id === intent.cardId);
+      return `${actor} plays ${card?.title ?? intent.cardId}`;
+    }
+    case "chooseCompany":
+      return `${actor} chooses ${COMPANY_LABEL[intent.company]} for [?]`;
+    case "buy":
+      return `${actor} buys ${intent.quantity} ${COMPANY_LABEL[intent.company]}`;
+    case "sell":
+      return `${actor} sells ${intent.quantity} ${COMPANY_LABEL[intent.company]}`;
+    case "endTrade":
+      return `${actor} ends trade`;
+    default: {
+      const _never: never = intent;
+      return String(_never);
+    }
+  }
+}
+
 export function reduce(state: GameState, intent: Intent): ReduceResult {
   const next = cloneState(state);
   next.lastError = null;
@@ -157,19 +220,24 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
       const phaseError = requirePhase(next, "chooseTurn");
       if (phaseError) return fail(state, phaseError);
       if (next.drawPile.length === 0) {
-        next.phase = "gameOver";
-        return { ok: true, state: next };
+        return fail(state, "Draw pile is empty. Choose Trade only.");
       }
       const card = next.drawPile.shift();
       if (!card) return fail(state, "Draw pile is empty.");
       next.lastDrawn = card;
       next.lastEvents = [];
+      appendLog(next, describeIntent(state, intent));
       if (card.kind === "risk") {
         applyResolvedCard(next, card);
+        appendLog(
+          next,
+          `${currentPlayer(next).name} resolves Risk: ${card.title}`,
+        );
         next.phase = "optionalTrade";
         return { ok: true, state: next };
       }
       currentPlayer(next).hand.push(card);
+      appendLog(next, `${currentPlayer(next).name} draws Action: ${card.title}`);
       next.phase = "chooseHandCard";
       return { ok: true, state: next };
     }
@@ -178,6 +246,7 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
       if (phaseError) return fail(state, phaseError);
       next.lastEvents = [];
       next.lastDrawn = null;
+      appendLog(next, describeIntent(state, intent));
       next.phase = "optionalTrade";
       return { ok: true, state: next };
     }
@@ -188,6 +257,7 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
       const index = player.hand.findIndex((card) => card.id === intent.cardId);
       if (index < 0) return fail(state, "That card is not in your hand.");
       const [card] = player.hand.splice(index, 1);
+      appendLog(next, `${player.name} plays ${card.title}`);
       if (hasChoice(card.ops)) {
         next.pendingCard = structuredClone(card);
         next.phase = "chooseCompany";
@@ -202,6 +272,10 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
       if (phaseError) return fail(state, phaseError);
       const card = next.pendingCard;
       if (!card) return fail(state, "No card waiting for a company choice.");
+      appendLog(
+        next,
+        `${currentPlayer(next).name} chooses ${COMPANY_LABEL[intent.company]} for [?]`,
+      );
       const bound = bindNextChoice(card, intent.company);
       if (typeof bound === "string") return fail(state, bound);
       if (hasChoice(bound.ops)) {
@@ -232,11 +306,13 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
         intent.type,
       );
       if (tradeError) return fail(state, tradeError);
+      appendLog(next, describeIntent(state, intent));
       return { ok: true, state: next };
     }
     case "endTrade": {
       const phaseError = requirePhase(next, "optionalTrade");
       if (phaseError) return fail(state, phaseError);
+      appendLog(next, describeIntent(state, intent));
       advanceTurn(next);
       return { ok: true, state: next };
     }

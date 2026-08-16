@@ -70,7 +70,9 @@ function resolveOpsWays(card: Card): NamedOp[][] {
 }
 
 function wealthAfter(state: GameState, ops: NamedOp[]): number[] {
-  const next = structuredClone(state);
+  const { random, ...rest } = state;
+  const next = structuredClone(rest) as GameState;
+  next.random = random;
   applyNamedOps(next, ops);
   return next.players.map((_, index) => netWorth(next, index));
 }

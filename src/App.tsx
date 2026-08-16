@@ -1,17 +1,26 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AI_STRATEGIES,
+  AI_STRATEGY_LABEL,
   COMPANY_LABEL,
   COMPANIES,
+  DEFAULT_ROUNDS,
+  MAX_ROUNDS,
+  MIN_ROUNDS,
   allowedChoices,
   canTrade,
+  chooseIntent,
   netWorth,
   nextChoicePrompt,
   ranking,
   reduce,
   setupGame,
+  type AiStrategy,
   type Card,
   type Company,
   type GameState,
+  type Intent,
+  type SeatConfig,
 } from "./engine";
 import { cardEffectRows } from "./ui/cardEffectRows";
 import { CompanyMark } from "./ui/CompanyMark";
@@ -104,7 +113,6 @@ function EffectRows({ card }: { card: Card }) {
     <ul className="effect-rows">
       {rows.map((row, index) => (
         <li key={index} className="effect-row">
-          <EffectMagnitude row={row} />
           {row.company ? (
             <CompanyMark company={row.company} size="sm" />
           ) : (
@@ -112,6 +120,7 @@ function EffectRows({ card }: { card: Card }) {
               ?
             </span>
           )}
+          <EffectMagnitude row={row} />
         </li>
       ))}
     </ul>
@@ -169,17 +178,42 @@ function CardFace({
   );
 }
 
-function Setup({ onStart }: { onStart: (names: string[]) => void }) {
+type SeatDraft = {
+  name: string
+  controller: "human" | "ai"
+  strategy: AiStrategy
+};
+
+function Setup({
+  onStart,
+}: {
+  onStart: (seats: SeatConfig[], roundsTotal: number) => void
+}) {
   const [count, setCount] = useState(2);
-  const [names, setNames] = useState(["Ada", "Bob", "Chen", "Dia"]);
+  const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
+  const [seats, setSeats] = useState<SeatDraft[]>([
+    { name: "Ada", controller: "human", strategy: "wealth" },
+    { name: "Bot", controller: "ai", strategy: "wealth" },
+    { name: "Chen", controller: "human", strategy: "punish" },
+    { name: "Dia", controller: "ai", strategy: "balanced" },
+  ]);
+
+  function updateSeat(index: number, patch: Partial<SeatDraft>) {
+    setSeats((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  }
+
   return (
     <div className="shell setup-shell">
       <header className="brand-block">
         <p className="brand">Börsenspiel</p>
         <h1>Hotseat market</h1>
         <p className="lede">
-          Draw or trade on one device. You cannot trade after an Action card —
-          only after a Risk, or on a Trade-only turn.
+          Draw or trade on one device. Mix human and AI seats. You cannot trade
+          after an Action card — only after a Risk, or on a Trade-only turn.
         </p>
       </header>
 
@@ -195,26 +229,87 @@ function Setup({ onStart }: { onStart: (names: string[]) => void }) {
         </select>
       </label>
 
-      <div className="name-grid">
-        {names.slice(0, count).map((name, i) => (
-          <label className="field" key={i}>
-            Player {i + 1}
-            <input
-              value={name}
-              onChange={(e) => {
-                const next = [...names];
-                next[i] = e.target.value;
-                setNames(next);
-              }}
-            />
-          </label>
+      <label className="field">
+        Rounds
+        <input
+          type="number"
+          min={MIN_ROUNDS}
+          max={MAX_ROUNDS}
+          value={rounds}
+          onChange={(e) =>
+            setRounds(
+              Math.min(
+                MAX_ROUNDS,
+                Math.max(MIN_ROUNDS, Number(e.target.value) || MIN_ROUNDS),
+              ),
+            )
+          }
+        />
+        <span className="field-hint">
+          One round = each seat takes one turn ({MIN_ROUNDS}–{MAX_ROUNDS})
+        </span>
+      </label>
+
+      <div className="name-grid seat-grid">
+        {seats.slice(0, count).map((seat, i) => (
+          <div className="seat-card" key={i}>
+            <label className="field">
+              Player {i + 1}
+              <input
+                value={seat.name}
+                onChange={(e) => updateSeat(i, { name: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              Controller
+              <select
+                value={seat.controller}
+                onChange={(e) =>
+                  updateSeat(i, {
+                    controller: e.target.value as "human" | "ai",
+                  })
+                }
+              >
+                <option value="human">Human</option>
+                <option value="ai">AI</option>
+              </select>
+            </label>
+            {seat.controller === "ai" ? (
+              <label className="field">
+                Strategy
+                <select
+                  value={seat.strategy}
+                  onChange={(e) =>
+                    updateSeat(i, {
+                      strategy: e.target.value as AiStrategy,
+                    })
+                  }
+                >
+                  {AI_STRATEGIES.map((id) => (
+                    <option key={id} value={id}>
+                      {AI_STRATEGY_LABEL[id]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
         ))}
       </div>
 
       <button
         type="button"
         className="cta"
-        onClick={() => onStart(names.slice(0, count))}
+        onClick={() =>
+          onStart(
+            seats.slice(0, count).map((seat) => ({
+              name: seat.name,
+              controller: seat.controller,
+              strategy: seat.controller === "ai" ? seat.strategy : null,
+            })),
+            rounds,
+          )
+        }
       >
         Start game
       </button>
@@ -254,6 +349,11 @@ function Scoreboard({
               <div className="score-identity">
                 {onTurn ? <span className="on-turn-pill">On turn</span> : null}
                 <strong className="score-name">{player.name}</strong>
+                {player.controller === "ai" ? (
+                  <span className="ai-pill">
+                    AI · {AI_STRATEGY_LABEL[player.strategy ?? "wealth"]}
+                  </span>
+                ) : null}
               </div>
               <div className="score-money">
                 <span className="score-cash">
@@ -302,6 +402,7 @@ function MarketDiagram({
   state,
   qty,
   setQty,
+  humanControls,
   onBuy,
   onSell,
   onEndTrade,
@@ -309,12 +410,13 @@ function MarketDiagram({
   state: GameState
   qty: number
   setQty: (n: number) => void
+  humanControls: boolean
   onBuy: (company: Company) => void
   onSell: (company: Company) => void
   onEndTrade: () => void
 }) {
   const ticks = priceBoardTicks();
-  const trading = canTrade(state);
+  const trading = canTrade(state) && humanControls;
 
   return (
     <section className="market-panel" aria-label="Share prices">
@@ -392,21 +494,22 @@ function MarketDiagram({
 function Hand({
   state,
   previewCardId,
+  playable,
   onPlay,
   onPreview,
 }: {
   state: GameState
   previewCardId: string | null
+  playable: boolean
   onPlay: (cardId: string) => void
   onPreview: (cardId: string | null) => void
 }) {
   const player = state.players[state.currentPlayerIndex];
-  const playable = state.phase === "chooseHandCard";
 
   return (
     <section className="hand-panel" aria-label="Your cards">
       <div className="section-head">
-        <h2>Your cards</h2>
+        <h2>{playable ? "Your cards" : `${player.name}'s cards`}</h2>
         {playable ? (
           <p>Hover a card to preview wealth changes. Click to play.</p>
         ) : null}
@@ -427,6 +530,26 @@ function Hand({
   );
 }
 
+function aiDelayMs(intent: Intent): number {
+  if (intent.type === "buy" || intent.type === "sell") return 550;
+  if (intent.type === "playCard" || intent.type === "chooseCompany") return 700;
+  if (intent.type === "draw") return 650;
+  return 450;
+}
+
+function ActionLog({ entries }: { entries: GameState["log"] }) {
+  return (
+    <details className="action-log">
+      <summary>Action log ({entries.length})</summary>
+      <ol className="action-log-list">
+        {[...entries].reverse().map((entry) => (
+          <li key={entry.id}>{entry.text}</li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 function Board({
   state,
   setState,
@@ -439,14 +562,52 @@ function Board({
   const [qty, setQty] = useState(1);
   const [previewCardId, setPreviewCardId] = useState<string | null>(null);
   const player = state.players[state.currentPlayerIndex];
+  const humanTurn = player.controller === "human" && state.phase !== "gameOver";
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  function act(intent: Parameters<typeof reduce>[1]) {
+  function act(intent: Intent) {
     setPreviewCardId(null);
-    setState(reduce(state, intent).state);
+    const result = reduce(stateRef.current, intent);
+    setState(result.state);
   }
 
+  useEffect(() => {
+    if (state.phase === "gameOver") return;
+    const current = state.players[state.currentPlayerIndex];
+    if (current.controller !== "ai") return;
+
+    let cancelled = false;
+    let timer = 0;
+
+    const step = () => {
+      if (cancelled) return;
+      const live = stateRef.current;
+      if (live.phase === "gameOver") return;
+      const seat = live.players[live.currentPlayerIndex];
+      if (seat.controller !== "ai") return;
+      try {
+        const intent = chooseIntent(live);
+        const delay = aiDelayMs(intent);
+        timer = window.setTimeout(() => {
+          if (cancelled) return;
+          const result = reduce(stateRef.current, intent);
+          setState(result.state);
+        }, delay);
+      } catch {
+        // Ignore transient AI errors; human can reset.
+      }
+    };
+
+    timer = window.setTimeout(step, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [state, setState]);
+
   const previewCard =
-    previewCardId && state.phase === "chooseHandCard"
+    previewCardId && state.phase === "chooseHandCard" && humanTurn
       ? player.hand.find((card) => card.id === previewCardId) ?? null
       : null;
   const preview = previewCard ? previewCardWealth(state, previewCard) : null;
@@ -459,6 +620,10 @@ function Board({
           <span className="pile-chip" title="Cards left in draw pile">
             Pile {state.drawPile.length}
           </span>
+          <span className="pile-chip" title="Rounds completed of total">
+            Round {Math.min(state.roundsCompleted + 1, state.roundsTotal)} /{" "}
+            {state.roundsTotal}
+          </span>
           <button type="button" className="secondary" onClick={onReset}>
             New game
           </button>
@@ -469,6 +634,11 @@ function Board({
         <div className="turn-banner" role="status">
           <span className="turn-label">On turn</span>
           <strong className="turn-name">{player.name}</strong>
+          {player.controller === "ai" ? (
+            <span className="ai-pill">
+              AI · {AI_STRATEGY_LABEL[player.strategy ?? "wealth"]}
+            </span>
+          ) : null}
           <span className="turn-cash">{formatMoney(player.cash)}</span>
         </div>
       ) : null}
@@ -490,6 +660,7 @@ function Board({
           state={state}
           qty={qty}
           setQty={setQty}
+          humanControls={humanTurn}
           onBuy={(company) => act({ type: "buy", company, quantity: qty })}
           onSell={(company) => act({ type: "sell", company, quantity: qty })}
           onEndTrade={() => act({ type: "endTrade" })}
@@ -499,26 +670,63 @@ function Board({
         ) : null}
       </div>
 
-      {state.phase === "chooseTurn" ? (
+      {state.phase === "chooseTurn" && humanTurn ? (
         <div className="action-row turn-actions">
           <button
             type="button"
-            className="cta"
+            className="turn-btn turn-btn-play"
+            disabled={state.drawPile.length === 0}
             onClick={() => act({ type: "draw" })}
           >
-            Draw
+            <span className="turn-btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                <rect
+                  x="5"
+                  y="3"
+                  width="11"
+                  height="15"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  transform="rotate(-8 10.5 10.5)"
+                />
+                <rect
+                  x="8"
+                  y="5"
+                  width="11"
+                  height="15"
+                  rx="2"
+                  fill="currentColor"
+                  fillOpacity="0.2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </span>
+            Play Card
           </button>
           <button
             type="button"
-            className="secondary"
+            className="turn-btn turn-btn-trade"
             onClick={() => act({ type: "startTrade" })}
           >
+            <span className="turn-btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                <path
+                  d="M7 8h11l-2.5-2.5M17 16H6l2.5 2.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
             Trade only
           </button>
         </div>
       ) : null}
 
-      {state.phase === "chooseCompany" && state.pendingCard ? (
+      {state.phase === "chooseCompany" && state.pendingCard && humanTurn ? (
         <section className="picker-panel">
           <div className="section-head">
             <h2>{nextChoicePrompt(state.pendingCard)}</h2>
@@ -544,6 +752,7 @@ function Board({
         <Hand
           state={state}
           previewCardId={previewCardId}
+          playable={state.phase === "chooseHandCard" && humanTurn}
           onPlay={(cardId) => act({ type: "playCard", cardId })}
           onPreview={setPreviewCardId}
         />
@@ -567,6 +776,8 @@ function Board({
           <Scoreboard state={state} preview={null} />
         </section>
       ) : null}
+
+      <ActionLog entries={state.log} />
     </div>
   );
 }
@@ -577,9 +788,9 @@ export function App() {
   if (!state) {
     return (
       <Setup
-        onStart={(names) => {
+        onStart={(seats, roundsTotal) => {
           try {
-            setState(setupGame(names));
+            setState(setupGame({ seats, roundsTotal }));
           } catch (error) {
             alert(error instanceof Error ? error.message : "Could not start");
           }

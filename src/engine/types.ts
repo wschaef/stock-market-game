@@ -17,6 +17,20 @@ export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 export const SPLIT_ABOVE = 250;
 export const WIPEOUT_BELOW = 10;
+export const DEFAULT_ROUNDS = 10;
+export const MIN_ROUNDS = 1;
+export const MAX_ROUNDS = 50;
+
+export const AI_STRATEGIES = ["wealth", "punish", "balanced"] as const;
+export type AiStrategy = (typeof AI_STRATEGIES)[number];
+
+export const AI_STRATEGY_LABEL: Record<AiStrategy, string> = {
+  wealth: "Investor",
+  punish: "Raider",
+  balanced: "Mixed",
+};
+
+export type PlayerController = "human" | "ai";
 
 export type NamedOp =
   | { type: "delta"; company: Company; amount: number }
@@ -42,6 +56,8 @@ export type Player = {
   cash: number
   shares: Record<Company, number>
   hand: Card[]
+  controller: PlayerController
+  strategy: AiStrategy | null
 };
 
 export type Phase =
@@ -62,6 +78,13 @@ export type GameEvent =
   | { type: "wipeout"; company: Company; target: number }
   | { type: "priceChange"; company: Company; from: number; to: number };
 
+export type GameLogEntry = {
+  id: number
+  text: string
+};
+
+export type RandomFn = () => number;
+
 export type GameState = {
   players: Player[]
   currentPlayerIndex: number
@@ -74,6 +97,10 @@ export type GameState = {
   lastEvents: GameEvent[]
   lastDrawn: Card | null
   lastError: string | null
+  roundsTotal: number
+  roundsCompleted: number
+  log: GameLogEntry[]
+  random: RandomFn
 };
 
 export type Intent =
@@ -84,3 +111,9 @@ export type Intent =
   | { type: "buy"; company: Company; quantity: number }
   | { type: "sell"; company: Company; quantity: number }
   | { type: "endTrade" };
+
+export type SeatConfig = {
+  name: string
+  controller: PlayerController
+  strategy?: AiStrategy | null
+};
