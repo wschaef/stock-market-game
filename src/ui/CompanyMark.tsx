@@ -1,33 +1,33 @@
 import type { Company } from "../engine/types";
 import { COMPANY_LABEL } from "../engine/types";
+import logoBayer from "../assets/logos/bayer.svg";
+import logoBmw from "../assets/logos/bmw.svg";
+import logoBp from "../assets/logos/bp.svg";
+import logoCommerzbank from "../assets/logos/commerzbank.svg";
 
 const MARK: Record<
   Company,
-  { className: string; abbr: string; logo: string; logoTone: "photo" | "glyph" }
+  { className: string; abbr: string; logo: string }
 > = {
   commerzbank: {
     className: "mark-commerzbank",
     abbr: "CBK",
-    logo: "/logos/commerzbank.svg",
-    logoTone: "glyph",
+    logo: logoCommerzbank,
   },
   bayer: {
     className: "mark-bayer",
     abbr: "BAYR",
-    logo: "/logos/bayer.svg",
-    logoTone: "photo",
+    logo: logoBayer,
   },
   bmw: {
     className: "mark-bmw",
     abbr: "BMW",
-    logo: "/logos/bmw.svg",
-    logoTone: "photo",
+    logo: logoBmw,
   },
   bp: {
     className: "mark-bp",
     abbr: "BP",
-    logo: "/logos/bp.svg",
-    logoTone: "photo",
+    logo: logoBp,
   },
 };
 
@@ -41,7 +41,7 @@ export function CompanyMark({
   const mark = MARK[company];
   return (
     <span
-      className={`company-mark ${mark.className} size-${size} tone-${mark.logoTone}`}
+      className={`company-mark ${mark.className} size-${size}`}
       title={COMPANY_LABEL[company]}
       aria-label={COMPANY_LABEL[company]}
     >
@@ -51,9 +51,6 @@ export function CompanyMark({
         alt=""
         draggable={false}
       />
-      <span className="company-mark-fallback" aria-hidden="true">
-        {mark.abbr}
-      </span>
     </span>
   );
 }
