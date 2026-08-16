@@ -575,8 +575,8 @@ h2 {
 
 .mark-commerzbank {
   border-radius: 7px;
-  background: #ffcc00;
-  padding: 12%;
+  background: transparent;
+  padding: 0;
 }
 
 .mark-commerzbank .company-mark-logo {
