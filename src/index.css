@@ -728,6 +728,44 @@ h2 {
 .turn-actions {
   justify-content: center;
   padding: 0.35rem 0;
+  gap: 0.75rem;
+}
+
+.turn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.85rem;
+  padding: 0.7rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.turn-btn-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.turn-btn-play {
+  color: var(--cta-ink);
+  background: linear-gradient(180deg, #3cb890, var(--cta));
+}
+
+.turn-btn-trade {
+  color: var(--cta-ink);
+  background: linear-gradient(180deg, #4a6b5c, #2f463b);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.turn-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .picker-row {

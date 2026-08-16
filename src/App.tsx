@@ -673,17 +673,53 @@ function Board({
         <div className="action-row turn-actions">
           <button
             type="button"
-            className="cta"
+            className="turn-btn turn-btn-play"
             disabled={state.drawPile.length === 0}
             onClick={() => act({ type: "draw" })}
           >
-            Draw
+            <span className="turn-btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                <rect
+                  x="5"
+                  y="3"
+                  width="11"
+                  height="15"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  transform="rotate(-8 10.5 10.5)"
+                />
+                <rect
+                  x="8"
+                  y="5"
+                  width="11"
+                  height="15"
+                  rx="2"
+                  fill="currentColor"
+                  fillOpacity="0.2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </span>
+            Play Card
           </button>
           <button
             type="button"
-            className="secondary"
+            className="turn-btn turn-btn-trade"
             onClick={() => act({ type: "startTrade" })}
           >
+            <span className="turn-btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                <path
+                  d="M7 8h11l-2.5-2.5M17 16H6l2.5 2.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
             Trade only
           </button>
         </div>
