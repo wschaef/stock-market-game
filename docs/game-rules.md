@@ -8,15 +8,15 @@ These replace physical-board ambiguities for the browser port.
 
 - **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Investor / Raider / Mixed). AI is deterministic (no LLM) and may take any legal action a human can.
 - **Money:** integer dollars. Each player starts with **$1,000**. Note denominations are unused on screen.
-- **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (6 per player).
-- **Risk cards:** Only in the draw pile mix (3 per player). Leftover cards after dealing/pile construction are unused.
+- **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (**9 per player**).
+- **Risk cards:** Only in the draw pile mix (**3 per player**). Leftover cards after dealing/pile construction are unused.
 - **Rounds:** A **round** is one full table cycle (every seat takes one turn). The game lasts a chosen number of rounds (**default 10**, min 1, max 50). After the last seat finishes the final round (including optional post-Risk trade), the game ends.
 - **Card recycle:** When a card is **played** (Action from hand or Risk from the draw), it is inserted at a **random position** in the remaining draw pile. The next draw is the new top of that pile.
 - **Turn choice:** **Draw** or **Trade only**.
   - **Draw:** reveal the top card. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell. If the draw pile is empty, Draw is not allowed (Trade only).
   - **Trade only:** no draw; buy and/or sell at current prices.
 - **No trade after an Action play.** Trading is allowed only on a Trade-only turn or after a Risk. This is the core of the game.
-- **`[?]`:** the current player selects which company gets that effect. The named company on the card is already fixed, so the pick is one of the **other three**.
+- **`[?]`:** the current player selects which company gets that effect. The named company on the card is already fixed, so each pick is one of the **other** companies not yet used on that card. Standard and multiplier cards have one `[?]`. **+100** cards have three: assign **−10**, **−20**, and **−30** to the three other companies (each once).
 - **Prices** are integers. After each company’s effect:
   - If **target > 250** (split): new price = **floor(target / 2)**; **each shareholder’s** shares of that company **double**. Repeat until price ≤ 250. **250** is legal (no split).
   - If **target < 10** (wipeout): all player shares of that company are **lost** (no cash); price resets to **100**. **10** is legal (no wipeout).
@@ -63,7 +63,7 @@ The player with the highest total net worth (Cash + Stock Values) at the end of 
 
 1. Set all 4 stock markers on the board to the starting value of **100**.
 2. Give each player **$1,000** starting capital and **4 Action Cards** as their starting hand.
-3. **Form the Draw Pile:** For each player in the game, mix **6 Action Cards** and **3 Risk Cards** together. Place this combined deck face-down in the center.
+3. **Form the Draw Pile:** For each player in the game, mix **9 Action Cards** and **3 Risk Cards** together. Place this combined deck face-down in the center. (With 4 players there are only 32 Action cards left after dealing hands, so the pile takes all remaining Actions — slightly above a pure 25% Risk mix.)
 
 **Turn Mechanics**
 
@@ -193,26 +193,26 @@ $$\text{Total Net Worth} = (\text{Total Stocks} \times \text{Final Stock Price})
 
 ### 3. +100 Action Cards (8 Cards)
 
-- **Commerzbank**
+Two identical copies per company.
+
+- **Commerzbank** (×2)
     
 
-  - `+100 Commerzbank` | `Bayer -20`, `BMW AG -20`, `BP -20`
-  - `+100 Commerzbank` | `Bayer -30`, `BMW AG -30`, `BP -30`
-- **Bayer**
+  - `+100 Commerzbank` | `−10 [?]` | `−20 [?]` | `−30 [?]`
+- **Bayer** (×2)
     
 
-  - `+100 Bayer` | `Commerzbank -20`, `BMW AG -20`, `BP -20`
-  - `+100 Bayer` | `Commerzbank -30`, `BMW AG -30`, `BP -30`
-- **BMW AG**
+  - `+100 Bayer` | `−10 [?]` | `−20 [?]` | `−30 [?]`
+- **BMW AG** (×2)
     
 
-  - `+100 BMW AG` | `Commerzbank -20`, `Bayer -20`, `BP -20`
-  - `+100 BMW AG` | `Commerzbank -30`, `Bayer -30`, `BP -30`
-- **BP**
+  - `+100 BMW AG` | `−10 [?]` | `−20 [?]` | `−30 [?]`
+- **BP** (×2)
     
 
-  - `+100 BP` | `Commerzbank -20`, `Bayer -20`, `BMW AG -20`
-  - `+100 BP` | `Commerzbank -30`, `Bayer -30`, `BMW AG -30`
+  - `+100 BP` | `−10 [?]` | `−20 [?]` | `−30 [?]`
+
+Assign −10, −20, and −30 to the three companies that are **not** the named +100 target (each company once).
 
 ### 4. Standard Action Cards (32 Cards)
 

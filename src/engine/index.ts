@@ -7,7 +7,13 @@ export {
 export { chooseIntent, strategyScoreVector } from "./ai";
 export { applyCompanyTarget, netWorth, ranking } from "./price";
 export { identityShuffle, setupGame } from "./setup";
-export { allowedChoices, canTrade, insertAtRandom, reduce } from "./turn";
+export {
+  allowedChoices,
+  canTrade,
+  insertAtRandom,
+  nextChoicePrompt,
+  reduce,
+} from "./turn";
 export {
   AI_STRATEGIES,
   AI_STRATEGY_LABEL,

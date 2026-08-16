@@ -4,7 +4,6 @@ import {
   COMPANIES,
   type AiStrategy,
   type Card,
-  type CardOp,
   type Company,
   type GameState,
   type Intent,
@@ -21,10 +20,6 @@ const INTENT_PREF: Record<Intent["type"], number> = {
   startTrade: 5,
   draw: 6,
 };
-
-function hasChoice(ops: CardOp[]): boolean {
-  return ops.some((op) => op.type === "deltaChoice" || op.type === "scaleChoice");
-}
 
 function bestRivalWorth(state: GameState, self: number): number {
   let best = -Infinity;
@@ -204,27 +199,36 @@ function bestHandPlayScore(
   return best ?? strategyScoreVector(state, self, strategy);
 }
 
+function scoreThroughChoices(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): number[] | null {
+  if (state.phase !== "chooseCompany") {
+    return strategyScoreVector(state, self, strategy);
+  }
+  const card = state.pendingCard;
+  if (!card) return null;
+  let best: number[] | null = null;
+  for (const company of allowedChoices(card)) {
+    const chosen = reduce(state, { type: "chooseCompany", company });
+    if (!chosen.ok) continue;
+    const vector = scoreThroughChoices(chosen.state, strategy, self);
+    if (!vector) continue;
+    if (!best || compareVectors(vector, best) > 0) best = vector;
+  }
+  return best;
+}
+
 function scoreCardPlay(
   state: GameState,
   card: Card,
   strategy: AiStrategy,
   self: number,
 ): number[] | null {
-  if (!hasChoice(card.ops)) {
-    const played = reduce(state, { type: "playCard", cardId: card.id });
-    if (!played.ok) return null;
-    return strategyScoreVector(played.state, self, strategy);
-  }
-  let best: number[] | null = null;
-  for (const company of allowedChoices(card)) {
-    const played = reduce(state, { type: "playCard", cardId: card.id });
-    if (!played.ok) continue;
-    const chosen = reduce(played.state, { type: "chooseCompany", company });
-    if (!chosen.ok) continue;
-    const vector = strategyScoreVector(chosen.state, self, strategy);
-    if (!best || compareVectors(vector, best) > 0) best = vector;
-  }
-  return best;
+  const played = reduce(state, { type: "playCard", cardId: card.id });
+  if (!played.ok) return null;
+  return scoreThroughChoices(played.state, strategy, self);
 }
 
 function chooseTurnIntent(state: GameState, strategy: AiStrategy, self: number): Intent {
@@ -264,12 +268,9 @@ function chooseCompanyIntent(state: GameState, strategy: AiStrategy, self: numbe
   if (!card) throw new Error("AI expected a pending card");
   const scored: Scored[] = [];
   for (const company of allowedChoices(card)) {
-    const vector = scoreAfter(
-      state,
-      { type: "chooseCompany", company },
-      strategy,
-      self,
-    );
+    const chosen = reduce(state, { type: "chooseCompany", company });
+    if (!chosen.ok) continue;
+    const vector = scoreThroughChoices(chosen.state, strategy, self);
     if (!vector) continue;
     scored.push({ intent: { type: "chooseCompany", company }, vector });
   }

@@ -11,6 +11,7 @@ import {
   canTrade,
   chooseIntent,
   netWorth,
+  nextChoicePrompt,
   ranking,
   reduce,
   setupGame,
@@ -728,7 +729,7 @@ function Board({
       {state.phase === "chooseCompany" && state.pendingCard && humanTurn ? (
         <section className="picker-panel">
           <div className="section-head">
-            <h2>Choose company</h2>
+            <h2>{nextChoicePrompt(state.pendingCard)}</h2>
             <p>{state.pendingCard.text || state.pendingCard.title}</p>
           </div>
           <div className="action-row picker-row">

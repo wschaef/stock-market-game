@@ -54,7 +54,7 @@ describe("cardEffectRows", () => {
     ]);
   });
 
-  it("maps +100 style into one row per company with the gain first", () => {
+  it("maps +100 style into +100 plus three [? ] penalty rows", () => {
     const card: Card = {
       id: "p100",
       kind: "action",
@@ -62,17 +62,17 @@ describe("cardEffectRows", () => {
       text: "",
       ops: [
         { type: "delta", company: "bmw", amount: 100 },
-        { type: "delta", company: "commerzbank", amount: -20 },
-        { type: "delta", company: "bayer", amount: -20 },
-        { type: "delta", company: "bp", amount: -20 },
+        { type: "deltaChoice", amount: -10 },
+        { type: "deltaChoice", amount: -20 },
+        { type: "deltaChoice", amount: -30 },
       ],
     };
-    expect(cardEffectRows(card)).toHaveLength(4);
-    expect(cardEffectRows(card)[0]).toEqual({
-      kind: "delta",
-      amount: 100,
-      company: "bmw",
-    });
+    expect(cardEffectRows(card)).toEqual([
+      { kind: "delta", amount: 100, company: "bmw" },
+      { kind: "delta", amount: -10, company: null },
+      { kind: "delta", amount: -20, company: null },
+      { kind: "delta", amount: -30, company: null },
+    ]);
   });
 
   it("maps risk deltas into one row per company for strip rendering", () => {

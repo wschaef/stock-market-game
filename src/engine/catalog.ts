@@ -6,19 +6,6 @@ import {
   type NamedOp,
 } from "./types";
 
-function others(named: Company): Company[] {
-  return COMPANIES.filter((c) => c !== named);
-}
-
-function plus100(named: Company, otherDelta: number): NamedOp[] {
-  return [
-    { type: "delta", company: named, amount: 100 },
-    ...others(named).map(
-      (company): NamedOp => ({ type: "delta", company, amount: -otherDelta }),
-    ),
-  ];
-}
-
 function buildActionCards(): Card[] {
   const cards: Card[] = [];
 
@@ -69,13 +56,18 @@ function buildActionCards(): Card[] {
       ],
     });
 
-    for (const otherDelta of [20, 30] as const) {
+    for (const copy of [1, 2] as const) {
       cards.push({
-        id: `p100-${company}-${otherDelta}`,
+        id: `p100-${company}-${copy}`,
         kind: "action",
-        title: `+100 ${label} | others ${-otherDelta}`,
-        text: `${label} jumps +100. Every other company ${-otherDelta}.`,
-        ops: plus100(company, otherDelta),
+        title: `+100 ${label} | −10/−20/−30 [?]`,
+        text: `${label} jumps +100. Assign −10, −20, and −30 to the other three companies (each once).`,
+        ops: [
+          { type: "delta", company, amount: 100 },
+          { type: "deltaChoice", amount: -10 },
+          { type: "deltaChoice", amount: -20 },
+          { type: "deltaChoice", amount: -30 },
+        ],
       });
     }
   }

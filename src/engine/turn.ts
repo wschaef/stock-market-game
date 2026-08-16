@@ -4,6 +4,7 @@ import {
   COMPANIES,
   type Card,
   type CardOp,
+  type ChoiceOp,
   type Company,
   type GameState,
   type Intent,
@@ -33,7 +34,7 @@ function currentPlayer(state: GameState) {
   return state.players[state.currentPlayerIndex];
 }
 
-function hasChoice(ops: CardOp[]): boolean {
+export function hasChoice(ops: CardOp[]): boolean {
   return ops.some((op) => op.type === "deltaChoice" || op.type === "scaleChoice");
 }
 
@@ -48,6 +49,27 @@ export function allowedChoices(card: Card): Company[] {
   return COMPANIES.filter((company) => !taken.has(company));
 }
 
+export function nextChoiceOp(card: Card): ChoiceOp | null {
+  for (const op of card.ops) {
+    if (op.type === "deltaChoice" || op.type === "scaleChoice") {
+      return op;
+    }
+  }
+  return null;
+}
+
+/** Human-readable prompt for the next unbound `[?]` on a pending card. */
+export function nextChoicePrompt(card: Card): string {
+  const op = nextChoiceOp(card);
+  if (!op) return "Choose company";
+  if (op.type === "deltaChoice") {
+    const label = op.amount > 0 ? `+${op.amount}` : `${op.amount}`;
+    return `Choose company for ${label}`;
+  }
+  const label = op.factor === 2 ? "2×" : "½";
+  return `Choose company for ${label}`;
+}
+
 function asNamed(op: CardOp, company: Company): NamedOp {
   if (op.type === "deltaChoice") {
     return { type: "delta", company, amount: op.amount };
@@ -58,15 +80,26 @@ function asNamed(op: CardOp, company: Company): NamedOp {
   return op;
 }
 
-function resolveOps(card: Card, choice: Company | null): NamedOp[] | string {
-  if (!hasChoice(card.ops)) {
-    return card.ops as NamedOp[];
+/** Bind the next choice op to `company`; returns error string on failure. */
+export function bindNextChoice(card: Card, company: Company): Card | string {
+  if (!nextChoiceOp(card)) {
+    return "No company choice left on this card.";
   }
-  if (!choice) return "Choose a company for [?].";
-  if (!allowedChoices(card).includes(choice)) {
-    return "Pick a different company than the one named on the card.";
+  if (!allowedChoices(card).includes(company)) {
+    return "Pick a different company than the ones already on the card.";
   }
-  return card.ops.map((op) => asNamed(op, choice));
+  let replaced = false;
+  const ops = card.ops.map((op) => {
+    if (
+      !replaced &&
+      (op.type === "deltaChoice" || op.type === "scaleChoice")
+    ) {
+      replaced = true;
+      return asNamed(op, company);
+    }
+    return op;
+  });
+  return { ...card, ops };
 }
 
 export function insertAtRandom(
@@ -109,13 +142,14 @@ function advanceTurn(state: GameState): void {
   );
 }
 
-function applyCard(state: GameState, card: Card, choice: Company | null): string | null {
-  const ops = resolveOps(card, choice);
-  if (typeof ops === "string") return ops;
-  state.lastEvents = applyNamedOps(state, ops);
+/** Apply a fully-bound card and recycle it into the draw pile. */
+function applyResolvedCard(state: GameState, card: Card): void {
+  if (hasChoice(card.ops)) {
+    throw new Error("Card still has unbound company choices.");
+  }
+  state.lastEvents = applyNamedOps(state, card.ops as NamedOp[]);
   insertAtRandom(state.drawPile, card, state.random);
   state.pendingCard = null;
-  return null;
 }
 
 function requirePhase(state: GameState, ...phases: GameState["phase"][]): string | null {
@@ -194,9 +228,11 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
       next.lastEvents = [];
       appendLog(next, describeIntent(state, intent));
       if (card.kind === "risk") {
-        const applyError = applyCard(next, card, null);
-        if (applyError) return fail(state, applyError);
-        appendLog(next, `${currentPlayer(next).name} resolves Risk: ${card.title}`);
+        applyResolvedCard(next, card);
+        appendLog(
+          next,
+          `${currentPlayer(next).name} resolves Risk: ${card.title}`,
+        );
         next.phase = "optionalTrade";
         return { ok: true, state: next };
       }
@@ -223,12 +259,11 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
       const [card] = player.hand.splice(index, 1);
       appendLog(next, `${player.name} plays ${card.title}`);
       if (hasChoice(card.ops)) {
-        next.pendingCard = card;
+        next.pendingCard = structuredClone(card);
         next.phase = "chooseCompany";
         return { ok: true, state: next };
       }
-      const applyError = applyCard(next, card, null);
-      if (applyError) return fail(state, applyError);
+      applyResolvedCard(next, card);
       advanceTurn(next);
       return { ok: true, state: next };
     }
@@ -241,8 +276,14 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
         next,
         `${currentPlayer(next).name} chooses ${COMPANY_LABEL[intent.company]} for [?]`,
       );
-      const applyError = applyCard(next, card, intent.company);
-      if (applyError) return fail(state, applyError);
+      const bound = bindNextChoice(card, intent.company);
+      if (typeof bound === "string") return fail(state, bound);
+      if (hasChoice(bound.ops)) {
+        next.pendingCard = bound;
+        next.phase = "chooseCompany";
+        return { ok: true, state: next };
+      }
+      applyResolvedCard(next, bound);
       advanceTurn(next);
       return { ok: true, state: next };
     }

@@ -1,8 +1,9 @@
 import { applyNamedOps, netWorth } from "../engine/price";
-import { allowedChoices } from "../engine/turn";
+import { allowedChoices, hasChoice } from "../engine/turn";
 import type {
   Card,
   CardOp,
+  ChoiceOp,
   Company,
   GameState,
   NamedOp,
@@ -23,35 +24,56 @@ export type CardWealthPreview = {
   players: PlayerWealthPreview[]
 };
 
-function hasChoice(ops: CardOp[]): boolean {
-  return ops.some((op) => op.type === "deltaChoice" || op.type === "scaleChoice");
+function isChoice(op: CardOp): op is ChoiceOp {
+  return op.type === "deltaChoice" || op.type === "scaleChoice";
 }
 
-function asNamed(op: CardOp, company: Company): NamedOp {
+function asNamed(op: ChoiceOp, company: Company): NamedOp {
   if (op.type === "deltaChoice") {
     return { type: "delta", company, amount: op.amount };
   }
-  if (op.type === "scaleChoice") {
-    return { type: "scale", company, factor: op.factor };
-  }
-  return op;
+  return { type: "scale", company, factor: op.factor };
 }
 
-function resolveOps(card: Card, choice: Company | null): NamedOp[] {
-  if (!hasChoice(card.ops)) {
-    return card.ops as NamedOp[];
+/** Distinct company sequences of length `n` drawn from `pool` without reuse. */
+function assignments(pool: Company[], n: number): Company[][] {
+  if (n === 0) return [[]];
+  if (n > pool.length) return [];
+  const result: Company[][] = [];
+  for (let i = 0; i < pool.length; i += 1) {
+    const pick = pool[i];
+    const rest = pool.filter((_, index) => index !== i);
+    for (const tail of assignments(rest, n - 1)) {
+      result.push([pick, ...tail]);
+    }
   }
-  if (!choice) {
-    throw new Error("Choice required");
-  }
-  return card.ops.map((op) => asNamed(op, choice));
+  return result;
 }
 
-function wealthAfter(state: GameState, card: Card, choice: Company | null): number[] {
+function resolveOpsWays(card: Card): NamedOp[][] {
+  const choiceOps = card.ops.filter(isChoice);
+  if (choiceOps.length === 0) {
+    return [card.ops as NamedOp[]];
+  }
+  const pool = allowedChoices(card);
+  return assignments(pool, choiceOps.length).map((companies) => {
+    let choiceIndex = 0;
+    return card.ops.map((op) => {
+      if (isChoice(op)) {
+        const company = companies[choiceIndex];
+        choiceIndex += 1;
+        return asNamed(op, company);
+      }
+      return op;
+    });
+  });
+}
+
+function wealthAfter(state: GameState, ops: NamedOp[]): number[] {
   const { random, ...rest } = state;
   const next = structuredClone(rest) as GameState;
   next.random = random;
-  applyNamedOps(next, resolveOps(card, choice));
+  applyNamedOps(next, ops);
   return next.players.map((_, index) => netWorth(next, index));
 }
 
@@ -62,10 +84,8 @@ export function previewCardWealth(
 ): CardWealthPreview {
   const befores = state.players.map((_, index) => netWorth(state, index));
   const choiceNeeded = hasChoice(card.ops);
-  const choiceCompanies = choiceNeeded ? allowedChoices(card) : [null];
-
-  const aftersPerChoice = choiceCompanies.map((choice) =>
-    wealthAfter(state, card, choice),
+  const aftersPerChoice = resolveOpsWays(card).map((ops) =>
+    wealthAfter(state, ops),
   );
 
   const players: PlayerWealthPreview[] = state.players.map((player, index) => {
