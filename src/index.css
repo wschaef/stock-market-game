@@ -585,7 +585,8 @@ h2 {
 
 .mark-bayer {
   border-radius: 50%;
-  background: transparent;
+  /* Original Bayer mark uses dark lettering; light disc keeps it readable on felt. */
+  background: #ffffff;
 }
 
 .mark-bmw {
