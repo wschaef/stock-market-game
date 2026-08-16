@@ -260,7 +260,7 @@ function Scoreboard({
                 </span>
                 <span className="score-wealth">
                   {formatMoney(wealth)}
-                  {delta && (delta.deltaMin !== 0 || delta.deltaMax !== 0) ? (
+                  {delta ? (
                     <span
                       className={`wealth-delta ${
                         delta.deltaMax < 0
