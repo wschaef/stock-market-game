@@ -202,6 +202,7 @@ describe("lastDrawnAnnouncement", () => {
         player("Bot", { controller: "ai", strategy: "wealth" }),
       ],
       currentPlayerIndex: 1,
+      phase: "optionalTrade",
       lastDrawn: riskCard,
     });
     expect(lastDrawnAnnouncement(state)).toContain("Risk all +10");
@@ -231,5 +232,18 @@ describe("lastDrawnAnnouncement", () => {
       lastDrawn: adaAction,
     });
     expect(lastDrawnAnnouncement(state)).toContain(adaAction.title);
+  });
+
+  it("does not name a leftover Action after the drawer’s turn has passed", () => {
+    const state = testState({
+      players: [
+        player("Ada", { controller: "human" }),
+        player("Bot", { controller: "ai", strategy: "wealth" }),
+      ],
+      currentPlayerIndex: 0,
+      phase: "chooseTurn",
+      lastDrawn: botAction,
+    });
+    expect(lastDrawnAnnouncement(state)).toBeNull();
   });
 });

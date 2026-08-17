@@ -62,8 +62,9 @@ export function lastDrawnAnnouncement(state: GameState): string | null {
   const card = state.lastDrawn;
   if (!card) return null;
   if (card.kind === "risk") {
-    return `Last drawn: ${card.title}`;
+    return state.phase === "optionalTrade" ? `Last drawn: ${card.title}` : null;
   }
+  if (state.phase !== "chooseHandCard") return null;
   const viewer = viewingSeatIndex(state);
   if (viewer !== null && viewer === state.currentPlayerIndex) {
     return `Last drawn: ${card.title}`;
