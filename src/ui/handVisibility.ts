@@ -1,4 +1,5 @@
 import type { Card, GameState } from "../engine/types";
+import { formatRiskHeadline } from "../engine/logFormat";
 
 export type FaceUpHand = {
   mode: "faceUp"
@@ -62,7 +63,9 @@ export function lastDrawnAnnouncement(state: GameState): string | null {
   const card = state.lastDrawn;
   if (!card) return null;
   if (card.kind === "risk") {
-    return state.phase === "optionalTrade" ? `Last drawn: ${card.title}` : null;
+    return state.phase === "optionalTrade"
+      ? `Last drawn: ${formatRiskHeadline(card, state.lastEvents)}`
+      : null;
   }
   if (state.phase !== "chooseHandCard") return null;
   const viewer = viewingSeatIndex(state);

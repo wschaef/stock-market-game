@@ -204,8 +204,16 @@ describe("lastDrawnAnnouncement", () => {
       currentPlayerIndex: 1,
       phase: "optionalTrade",
       lastDrawn: riskCard,
+      lastEvents: [
+        { type: "priceChange", company: "commerzbank", from: 100, to: 110 },
+        { type: "priceChange", company: "bayer", from: 100, to: 110 },
+        { type: "priceChange", company: "bmw", from: 100, to: 110 },
+        { type: "priceChange", company: "bp", from: 100, to: 110 },
+      ],
     });
-    expect(lastDrawnAnnouncement(state)).toContain("Risk all +10");
+    expect(lastDrawnAnnouncement(state)).toBe(
+      "Last drawn: Risk all +10: Commerzbank +10 ($110), Bayer +10 ($110), BMW AG +10 ($110), BP +10 ($110)",
+    );
   });
 
   it("hides an Action title when the owner is not the local viewer", () => {

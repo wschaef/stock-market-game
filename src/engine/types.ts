@@ -79,9 +79,19 @@ export type GameEvent =
   | { type: "wipeout"; company: Company; from: number; target: number }
   | { type: "priceChange"; company: Company; from: number; to: number };
 
+export type TradeLog = {
+  actor: string
+  company: Company
+  bought: number
+  sold: number
+  price: number
+};
+
 export type GameLogEntry = {
   id: number
   text: string
+  trade?: TradeLog
+  play?: { actor: string }
 };
 
 export type RandomFn = () => number;

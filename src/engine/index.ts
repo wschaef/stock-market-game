@@ -6,6 +6,11 @@ export {
 } from "./catalog";
 export { chooseIntent, strategyScoreVector } from "./ai";
 export { applyCompanyTarget, netWorth, ranking } from "./price";
+export {
+  formatCardOps,
+  formatRiskHeadline,
+  formatTradeLine,
+} from "./logFormat";
 export { identityShuffle, setupGame } from "./setup";
 export {
   allowedChoices,

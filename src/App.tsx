@@ -152,7 +152,9 @@ function CardFace({
   const body = (
     <>
       <EffectRows card={card} />
-      <span className="card-kind">{card.kind}</span>
+      <span className="card-kind">
+        {card.kind === "risk" ? card.title : card.kind}
+      </span>
     </>
   );
 
