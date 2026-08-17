@@ -38,6 +38,7 @@ export function applyCompanyTarget(
     events.push({
       type: "split",
       company,
+      from,
       target,
       newPrice: remaining,
       doubledShares: doubled,
@@ -50,7 +51,7 @@ export function applyCompanyTarget(
       player.shares[company] = 0;
     }
     state.prices[company] = 100;
-    events.push({ type: "wipeout", company, target });
+    events.push({ type: "wipeout", company, from, target });
     return events;
   }
 

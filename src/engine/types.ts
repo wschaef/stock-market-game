@@ -71,11 +71,12 @@ export type GameEvent =
   | {
       type: "split"
       company: Company
+      from: number
       target: number
       newPrice: number
       doubledShares: boolean
     }
-  | { type: "wipeout"; company: Company; target: number }
+  | { type: "wipeout"; company: Company; from: number; target: number }
   | { type: "priceChange"; company: Company; from: number; to: number };
 
 export type GameLogEntry = {

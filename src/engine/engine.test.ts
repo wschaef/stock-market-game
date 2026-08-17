@@ -152,7 +152,12 @@ describe("split and wipeout", () => {
     expect(state.prices.commerzbank).toBe(150);
     expect(state.players[0].shares.commerzbank).toBe(10);
     expect(state.players[1].shares.commerzbank).toBe(6);
-    expect(events[0]).toMatchObject({ type: "split", newPrice: 150, target: 300 });
+    expect(events[0]).toMatchObject({
+      type: "split",
+      from: 200,
+      newPrice: 150,
+      target: 300,
+    });
   });
 
   it("does not split at exactly 250", () => {
@@ -171,7 +176,7 @@ describe("split and wipeout", () => {
     expect(state.prices.bayer).toBe(100);
     expect(state.players[0].shares.bayer).toBe(0);
     expect(state.players[1].shares.bayer).toBe(0);
-    expect(events[0]).toMatchObject({ type: "wipeout", target: 5 });
+    expect(events[0]).toMatchObject({ type: "wipeout", from: 100, target: 5 });
   });
 
   it("does not wipe out at exactly 10", () => {

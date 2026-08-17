@@ -38,6 +38,8 @@ import {
 import {
   priceBoardFilledCount,
   priceBoardTicks,
+  lastPriceSpan,
+  pricePieceHighlight,
 } from "./ui/relativeBars";
 
 const COMPANY_TONE: Record<Company, string> = {
@@ -454,6 +456,7 @@ function MarketDiagram({
       <ul className="price-diagram">
         {COMPANIES.map((company) => {
           const filled = priceBoardFilledCount(state.prices[company]);
+          const span = lastPriceSpan(state.lastEvents, company);
           return (
             <li className={`price-row ${COMPANY_TONE[company]}`} key={company}>
               <div className="price-meta">
@@ -472,13 +475,24 @@ function MarketDiagram({
                 role="img"
                 aria-label={`${COMPANY_LABEL[company]} at ${state.prices[company]}`}
               >
-                {ticks.map((tick, index) => (
-                  <span
-                    key={tick}
-                    className={index < filled ? "piece filled" : "piece"}
-                    title={`$${tick}`}
-                  />
-                ))}
+                {ticks.map((tick, index) => {
+                  const change = span
+                    ? pricePieceHighlight(index, span.from, span.to)
+                    : null;
+                  return (
+                    <span
+                      key={tick}
+                      className={[
+                        "piece",
+                        index < filled ? "filled" : "",
+                        change ?? "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      title={`$${tick}`}
+                    />
+                  );
+                })}
               </div>
               {trading ? (
                 <div className="share-trade">

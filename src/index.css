@@ -405,7 +405,9 @@ h2 {
   transition:
     background-color 360ms ease,
     border-color 360ms ease,
-    transform 280ms ease;
+    transform 280ms ease,
+    filter 280ms ease,
+    opacity 280ms ease;
 }
 
 .bar-track .piece.filled {
@@ -427,6 +429,37 @@ h2 {
 .tone-bp .piece.filled {
   background: var(--bp);
   border-color: color-mix(in srgb, var(--bp) 70%, #000);
+}
+
+.tone-commerzbank .piece.gained,
+.tone-commerzbank .piece.lost {
+  background: var(--commerzbank);
+  border-color: color-mix(in srgb, var(--commerzbank) 70%, #000);
+}
+.tone-bayer .piece.gained,
+.tone-bayer .piece.lost {
+  background: var(--bayer);
+  border-color: color-mix(in srgb, var(--bayer) 70%, #000);
+}
+.tone-bmw .piece.gained,
+.tone-bmw .piece.lost {
+  background: var(--bmw);
+  border-color: color-mix(in srgb, var(--bmw) 70%, #000);
+}
+.tone-bp .piece.gained,
+.tone-bp .piece.lost {
+  background: var(--bp);
+  border-color: color-mix(in srgb, var(--bp) 70%, #000);
+}
+
+.bar-track .piece.gained {
+  filter: brightness(1.55);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.35);
+}
+
+.bar-track .piece.lost {
+  filter: brightness(0.55);
+  opacity: 0.7;
 }
 
 .trade-toolbar {
