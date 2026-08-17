@@ -222,6 +222,55 @@ describe("draw and play", () => {
     expect(traded.error).toMatch(/cannot trade after playing an Action/i);
   });
 
+  it("does not put a drawn Action title in the log until it is played", () => {
+    const state = testState({
+      drawPile: [actionNoChoice],
+      players: [
+        {
+          id: "p1",
+          name: "Ada",
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [actionWithChoice],
+          controller: "human",
+          strategy: null,
+        },
+        {
+          id: "p2",
+          name: "Bob",
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [],
+          controller: "human",
+          strategy: null,
+        },
+      ],
+    });
+    const drawn = reduce(state, { type: "draw" });
+    expect(drawn.ok).toBe(true);
+    const drawText = drawn.state.log.map((entry) => entry.text).join("\n");
+    expect(drawText).not.toContain(actionNoChoice.title);
+    expect(drawText).toMatch(/draws an Action/i);
+
+    const played = reduce(drawn.state, {
+      type: "playCard",
+      cardId: actionNoChoice.id,
+    });
+    expect(played.ok).toBe(true);
+    expect(played.state.log.map((entry) => entry.text).join("\n")).toContain(
+      actionNoChoice.title,
+    );
+  });
+
+  it("names a drawn Risk in the log because it is resolved immediately", () => {
+    const state = testState({ drawPile: [riskNoChoice] });
+    const drawn = reduce(state, { type: "draw" });
+    expect(drawn.ok).toBe(true);
+    expect(drawn.state.log.map((entry) => entry.text).join("\n")).toContain(
+      riskNoChoice.title,
+    );
+  });
+
   it("plays a Risk immediately and then allows trade", () => {
     const state = testState({ drawPile: [riskNoChoice] });
     const drawn = reduce(state, { type: "draw" });

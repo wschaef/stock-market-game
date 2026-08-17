@@ -13,7 +13,8 @@ These replace physical-board ambiguities for the browser port.
 - **Rounds:** A **round** is one full table cycle (every seat takes one turn). The game lasts a chosen number of rounds (**default 10**, min 1, max 50). After the last seat finishes the final round (including optional post-Risk trade), the game ends.
 - **Card recycle:** When a card is **played** (Action from hand or Risk from the draw), it is inserted at a **random position** in the remaining draw pile. The next draw is the new top of that pile.
 - **Turn choice:** **Draw** or **Trade only**.
-  - **Draw:** reveal the top card. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell. If the draw pile is empty, Draw is not allowed (Trade only).
+  - **Draw:** reveal the top card **to the current player**. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell. If the draw pile is empty, Draw is not allowed (Trade only).
+- **Hidden hands:** Other seats’ unplayed cards stay face-down. A drawn Action is private until played; a drawn Risk is public.
   - **Trade only:** no draw; buy and/or sell at current prices.
 - **No trade after an Action play.** Trading is allowed only on a Trade-only turn or after a Risk. This is the core of the game.
 - **`[?]`:** the current player selects which company gets that effect. The named company on the card is already fixed, so each pick is one of the **other** companies not yet used on that card. Standard and multiplier cards have one `[?]`. **+100** cards have three: assign **−10**, **−20**, and **−30** to the three other companies (each once).
