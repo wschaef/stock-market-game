@@ -205,6 +205,12 @@ h2 {
 
 .drawn {
   color: var(--muted);
+  animation: rise 360ms ease both;
+}
+
+.event {
+  color: var(--warn);
+  animation: rise 360ms ease both;
 }
 
 .field {
@@ -298,6 +304,7 @@ h2 {
 
 .action-log-list li {
   margin-bottom: 0.25rem;
+  animation: rise 280ms ease;
 }
 
 .section-head {
@@ -395,6 +402,16 @@ h2 {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  transition:
+    background-color 360ms ease,
+    border-color 360ms ease,
+    transform 280ms ease,
+    filter 280ms ease,
+    opacity 280ms ease;
+}
+
+.bar-track .piece.filled {
+  animation: piece-fill 360ms ease;
 }
 
 .tone-commerzbank .piece.filled {
@@ -412,6 +429,37 @@ h2 {
 .tone-bp .piece.filled {
   background: var(--bp);
   border-color: color-mix(in srgb, var(--bp) 70%, #000);
+}
+
+.tone-commerzbank .piece.gained,
+.tone-commerzbank .piece.lost {
+  background: var(--commerzbank);
+  border-color: color-mix(in srgb, var(--commerzbank) 70%, #000);
+}
+.tone-bayer .piece.gained,
+.tone-bayer .piece.lost {
+  background: var(--bayer);
+  border-color: color-mix(in srgb, var(--bayer) 70%, #000);
+}
+.tone-bmw .piece.gained,
+.tone-bmw .piece.lost {
+  background: var(--bmw);
+  border-color: color-mix(in srgb, var(--bmw) 70%, #000);
+}
+.tone-bp .piece.gained,
+.tone-bp .piece.lost {
+  background: var(--bp);
+  border-color: color-mix(in srgb, var(--bp) 70%, #000);
+}
+
+.bar-track .piece.gained {
+  filter: brightness(1.55);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.35);
+}
+
+.bar-track .piece.lost {
+  filter: brightness(0.55);
+  opacity: 0.7;
 }
 
 .trade-toolbar {
@@ -504,6 +552,21 @@ h2 {
 }
 .wealth-delta.mixed {
   color: var(--warn);
+}
+
+.value-flash {
+  display: inline-flex;
+  align-items: baseline;
+  gap: inherit;
+  animation: value-pop 520ms ease;
+}
+
+.value-flash-pos {
+  color: var(--pos);
+}
+
+.value-flash-neg {
+  color: var(--neg);
 }
 
 .preview-note {
@@ -623,6 +686,36 @@ h2 {
     0 1px 0 rgba(255, 255, 255, 0.75) inset,
     0 12px 24px rgba(0, 0, 0, 0.28);
   transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.card-enter {
+  animation: deal-in 420ms ease;
+}
+
+.card-back {
+  align-content: center;
+  justify-items: center;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      #1f5344 0 10px,
+      #163c32 10px 20px
+    );
+  color: #fff8e8;
+  border-color: rgba(255, 248, 232, 0.18);
+}
+
+.card-back-mark {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 248, 232, 0.4);
+  font-family: Syne, Figtree, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 
 .effect-rows {
@@ -822,10 +915,6 @@ h2 {
   font-weight: 550;
 }
 
-.event {
-  color: var(--warn);
-}
-
 @keyframes rise {
   from {
     opacity: 0;
@@ -845,6 +934,40 @@ h2 {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) rotate(2.5deg) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes piece-fill {
+  from {
+    transform: scaleY(0.35);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes value-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 

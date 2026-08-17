@@ -22,8 +22,15 @@ import {
   type Intent,
   type SeatConfig,
 } from "./engine";
+import { AI_PACE, aiDelayMs } from "./ui/aiPacing";
 import { cardEffectRows } from "./ui/cardEffectRows";
 import { CompanyMark } from "./ui/CompanyMark";
+import { FlashOnChange } from "./ui/FlashOnChange";
+import {
+  handPresentation,
+  lastDrawnAnnouncement,
+  type HandPresentation,
+} from "./ui/handVisibility";
 import {
   previewCardWealth,
   type CardWealthPreview,
@@ -31,6 +38,8 @@ import {
 import {
   priceBoardFilledCount,
   priceBoardTicks,
+  lastPriceSpan,
+  pricePieceHighlight,
 } from "./ui/relativeBars";
 
 const COMPANY_TONE: Record<Company, string> = {
@@ -160,7 +169,7 @@ function CardFace({
     return (
       <button
         type="button"
-        className={`card ${previewActive ? "card-previewing" : ""}`}
+        className={`card card-enter ${previewActive ? "card-previewing" : ""}`}
         onClick={() => onPlay(card.id)}
         aria-label={card.title}
         title={card.text}
@@ -172,8 +181,26 @@ function CardFace({
   }
 
   return (
-    <article className="card" aria-label={card.title} title={card.text}>
+    <article
+      className="card card-enter"
+      aria-label={card.title}
+      title={card.text}
+    >
       {body}
+    </article>
+  );
+}
+
+function CardBack({ index }: { index: number }) {
+  return (
+    <article
+      className="card card-back card-enter"
+      aria-label="Face-down card"
+      style={{ animationDelay: `${index * 45}ms` }}
+    >
+      <span className="card-back-mark" aria-hidden="true">
+        B
+      </span>
     </article>
   );
 }
@@ -356,10 +383,10 @@ function Scoreboard({
                 ) : null}
               </div>
               <div className="score-money">
-                <span className="score-cash">
+                <FlashOnChange value={player.cash} className="score-cash">
                   Cash {formatMoney(player.cash)}
-                </span>
-                <span className="score-wealth">
+                </FlashOnChange>
+                <FlashOnChange value={wealth} className="score-wealth">
                   {formatMoney(wealth)}
                   {delta ? (
                     <span
@@ -374,7 +401,7 @@ function Scoreboard({
                       {formatDelta(delta.deltaMin, delta.deltaMax)}
                     </span>
                   ) : null}
-                </span>
+                </FlashOnChange>
               </div>
               <ul className="score-shares">
                 {COMPANIES.map((company) => {
@@ -385,7 +412,9 @@ function Scoreboard({
                       className={count === 0 ? "dim" : undefined}
                     >
                       <CompanyMark company={company} size="sm" />
-                      <span>{count}</span>
+                      <FlashOnChange value={count}>
+                        <span>{count}</span>
+                      </FlashOnChange>
                     </li>
                   );
                 })}
@@ -427,28 +456,43 @@ function MarketDiagram({
       <ul className="price-diagram">
         {COMPANIES.map((company) => {
           const filled = priceBoardFilledCount(state.prices[company]);
+          const span = lastPriceSpan(state.lastEvents, company);
           return (
             <li className={`price-row ${COMPANY_TONE[company]}`} key={company}>
               <div className="price-meta">
                 <span className="price-identity">
                   <CompanyMark company={company} size="md" />
                 </span>
-                <span className="price-value">
+                <FlashOnChange
+                  value={state.prices[company]}
+                  className="price-value"
+                >
                   {formatMoney(state.prices[company])}
-                </span>
+                </FlashOnChange>
               </div>
               <div
                 className="bar-track"
                 role="img"
                 aria-label={`${COMPANY_LABEL[company]} at ${state.prices[company]}`}
               >
-                {ticks.map((tick, index) => (
-                  <span
-                    key={tick}
-                    className={index < filled ? "piece filled" : "piece"}
-                    title={`$${tick}`}
-                  />
-                ))}
+                {ticks.map((tick, index) => {
+                  const change = span
+                    ? pricePieceHighlight(index, span.from, span.to)
+                    : null;
+                  return (
+                    <span
+                      key={tick}
+                      className={[
+                        "piece",
+                        index < filled ? "filled" : "",
+                        change ?? "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      title={`$${tick}`}
+                    />
+                  );
+                })}
               </div>
               {trading ? (
                 <div className="share-trade">
@@ -492,34 +536,53 @@ function MarketDiagram({
 }
 
 function Hand({
-  state,
+  presentation,
   previewCardId,
-  playable,
   onPlay,
   onPreview,
 }: {
-  state: GameState
+  presentation: HandPresentation
   previewCardId: string | null
-  playable: boolean
   onPlay: (cardId: string) => void
   onPreview: (cardId: string | null) => void
 }) {
-  const player = state.players[state.currentPlayerIndex];
+  if (presentation.mode === "hidden") {
+    return (
+      <section
+        className="hand-panel"
+        aria-label={`${presentation.ownerName}'s cards, face down`}
+      >
+        <div className="section-head">
+          <h2>{presentation.label}</h2>
+          <p>Hidden from other players.</p>
+        </div>
+        <div className="hand hand-hidden">
+          {Array.from({ length: presentation.count }, (_, index) => (
+            <CardBack key={index} index={index} />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="hand-panel" aria-label="Your cards">
       <div className="section-head">
-        <h2>{playable ? "Your cards" : `${player.name}'s cards`}</h2>
-        {playable ? (
+        <h2>{presentation.label}</h2>
+        {presentation.playable ? (
           <p>Hover a card to preview wealth changes. Click to play.</p>
-        ) : null}
+        ) : (
+          <p>Only you can see these cards.</p>
+        )}
       </div>
-      <div className={`hand ${playable ? "hand-playable" : "hand-readonly"}`}>
-        {player.hand.map((card) => (
+      <div
+        className={`hand ${presentation.playable ? "hand-playable" : "hand-readonly"}`}
+      >
+        {presentation.cards.map((card) => (
           <CardFace
             key={card.id}
             card={card}
-            playable={playable}
+            playable={presentation.playable}
             previewActive={previewCardId === card.id}
             onPlay={onPlay}
             onPreview={onPreview}
@@ -528,13 +591,6 @@ function Hand({
       </div>
     </section>
   );
-}
-
-function aiDelayMs(intent: Intent): number {
-  if (intent.type === "buy" || intent.type === "sell") return 550;
-  if (intent.type === "playCard" || intent.type === "chooseCompany") return 700;
-  if (intent.type === "draw") return 650;
-  return 450;
 }
 
 function ActionLog({ entries }: { entries: GameState["log"] }) {
@@ -599,7 +655,7 @@ function Board({
       }
     };
 
-    timer = window.setTimeout(step, 280);
+    timer = window.setTimeout(step, AI_PACE.think);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -607,10 +663,14 @@ function Board({
   }, [state, setState]);
 
   const previewCard =
-    previewCardId && state.phase === "chooseHandCard" && humanTurn
+    previewCardId &&
+    state.phase === "chooseHandCard" &&
+    humanTurn
       ? player.hand.find((card) => card.id === previewCardId) ?? null
       : null;
   const preview = previewCard ? previewCardWealth(state, previewCard) : null;
+  const drawnLine = lastDrawnAnnouncement(state);
+  const cards = handPresentation(state);
 
   return (
     <div className="shell board-shell">
@@ -631,7 +691,7 @@ function Board({
       </header>
 
       {state.phase !== "gameOver" ? (
-        <div className="turn-banner" role="status">
+        <div className="turn-banner" role="status" key={player.id}>
           <span className="turn-label">On turn</span>
           <strong className="turn-name">{player.name}</strong>
           {player.controller === "ai" ? (
@@ -639,7 +699,9 @@ function Board({
               AI · {AI_STRATEGY_LABEL[player.strategy ?? "wealth"]}
             </span>
           ) : null}
-          <span className="turn-cash">{formatMoney(player.cash)}</span>
+          <FlashOnChange value={player.cash} className="turn-cash">
+            {formatMoney(player.cash)}
+          </FlashOnChange>
         </div>
       ) : null}
 
@@ -649,9 +711,9 @@ function Board({
           {line}
         </p>
       ))}
-      {state.lastDrawn ? (
-        <p className="drawn">
-          Last drawn: <strong>{state.lastDrawn.title}</strong>
+      {drawnLine ? (
+        <p className="drawn" key={drawnLine}>
+          {drawnLine}
         </p>
       ) : null}
 
@@ -750,9 +812,8 @@ function Board({
 
       {state.phase !== "gameOver" ? (
         <Hand
-          state={state}
+          presentation={cards}
           previewCardId={previewCardId}
-          playable={state.phase === "chooseHandCard" && humanTurn}
           onPlay={(cardId) => act({ type: "playCard", cardId })}
           onPreview={setPreviewCardId}
         />

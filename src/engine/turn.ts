@@ -237,7 +237,7 @@ export function reduce(state: GameState, intent: Intent): ReduceResult {
         return { ok: true, state: next };
       }
       currentPlayer(next).hand.push(card);
-      appendLog(next, `${currentPlayer(next).name} draws Action: ${card.title}`);
+      appendLog(next, `${currentPlayer(next).name} draws an Action`);
       next.phase = "chooseHandCard";
       return { ok: true, state: next };
     }
