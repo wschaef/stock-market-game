@@ -305,6 +305,7 @@ h2 {
 .action-log-list li {
   margin-bottom: 0.25rem;
   animation: rise 280ms ease;
+  overflow-wrap: anywhere;
 }
 
 .section-head {

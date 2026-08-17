@@ -256,23 +256,31 @@ describe("draw and play", () => {
     const drawText = drawn.state.log.map((entry) => entry.text).join("\n");
     expect(drawText).not.toContain(actionNoChoice.title);
     expect(drawText).toMatch(/draws an Action/i);
+    expect(drawText).not.toMatch(/^Ada draws$/m);
 
     const played = reduce(drawn.state, {
       type: "playCard",
       cardId: actionNoChoice.id,
     });
     expect(played.ok).toBe(true);
-    expect(played.state.log.map((entry) => entry.text).join("\n")).toContain(
-      actionNoChoice.title,
-    );
+    const playText = played.state.log.map((entry) => entry.text).join("\n");
+    expect(playText).toContain("+100 Commerzbank");
+    expect(playText).toContain("-20 Bayer");
+    expect(playText).toContain("-20 BMW AG");
+    expect(playText).toContain("-20 BP");
   });
 
   it("names a drawn Risk in the log because it is resolved immediately", () => {
     const state = testState({ drawPile: [riskNoChoice] });
     const drawn = reduce(state, { type: "draw" });
     expect(drawn.ok).toBe(true);
-    expect(drawn.state.log.map((entry) => entry.text).join("\n")).toContain(
-      riskNoChoice.title,
+    const text = drawn.state.log.map((entry) => entry.text).join("\n");
+    expect(text).toContain(riskNoChoice.title);
+    expect(text).toContain("Commerzbank +10 ($110)");
+    expect(text).toContain("Bayer +10 ($110)");
+    expect(text).not.toMatch(/resolves Risk/i);
+    expect(text.split("\n").filter((line) => /draws/.test(line))).toHaveLength(
+      1,
     );
   });
 
@@ -334,6 +342,10 @@ describe("draw and play", () => {
     expect(picked.state.prices.bmw).toBe(40);
     expect(picked.state.phase).toBe("chooseTurn");
     expect(picked.state.currentPlayerIndex).toBe(1);
+    const logText = picked.state.log.map((entry) => entry.text).join("\n");
+    expect(logText).toContain("+30 Commerzbank / -60 BMW AG");
+    expect(logText).not.toContain("[?]");
+    expect(logText).not.toMatch(/chooses .* for \[\?\]/);
   });
 
   it("assigns −10/−20/−30 on a +100 card across three distinct other companies", () => {
@@ -391,6 +403,11 @@ describe("draw and play", () => {
     expect(third.state.prices.bp).toBe(70);
     expect(third.state.phase).toBe("chooseTurn");
     expect(third.state.currentPlayerIndex).toBe(1);
+    const playLines = third.state.log.filter((entry) => entry.play);
+    expect(playLines).toHaveLength(1);
+    expect(playLines[0].text).toBe(
+      "Ada plays +100 Commerzbank / -10 Bayer / -20 BMW AG / -30 BP",
+    );
   });
 
   it("rejects trade after a completed Action play", () => {
@@ -566,5 +583,100 @@ describe("card recycle", () => {
     expect(drawn.ok).toBe(true);
     expect(drawn.state.phase).toBe("optionalTrade");
     expect(drawn.state.drawPile.map((c) => c.id)).toEqual(["risk-test"]);
+  });
+});
+
+describe("action log", () => {
+  it("merges buy and sell of the same share onto one priced line", () => {
+    const state = testState({
+      phase: "optionalTrade",
+      prices: { commerzbank: 100, bayer: 100, bmw: 110, bp: 100 },
+    });
+    const bought = reduce(state, {
+      type: "buy",
+      company: "bmw",
+      quantity: 2,
+    });
+    expect(bought.ok).toBe(true);
+    expect(bought.state.log.map((e) => e.text)).toContain(
+      "Ada buys 2 BMW AG at $110 ($220)",
+    );
+
+    const sold = reduce(bought.state, {
+      type: "sell",
+      company: "bmw",
+      quantity: 1,
+    });
+    expect(sold.ok).toBe(true);
+    const texts = sold.state.log.map((e) => e.text);
+    expect(texts.filter((line) => /BMW AG/.test(line))).toEqual([
+      "Ada buys 2 / sells 1 BMW AG at $110 (buy $220, sell $110)",
+    ]);
+  });
+
+  it("keeps different companies on separate trade lines", () => {
+    const state = testState({
+      phase: "optionalTrade",
+      prices: { commerzbank: 100, bayer: 80, bmw: 110, bp: 100 },
+    });
+    const bmw = reduce(state, { type: "buy", company: "bmw", quantity: 1 });
+    const bayer = reduce(bmw.state, {
+      type: "buy",
+      company: "bayer",
+      quantity: 2,
+    });
+    const bmwAgain = reduce(bayer.state, {
+      type: "sell",
+      company: "bmw",
+      quantity: 1,
+    });
+    expect(bmwAgain.state.log.map((e) => e.text)).toEqual([
+      "Ada buys 2 Bayer at $80 ($160)",
+      "Ada buys 1 / sells 1 BMW AG at $110 (buy $110, sell $110)",
+    ]);
+  });
+
+  it("does not merge the same share across a new trade session", () => {
+    const first = reduce(testState({ phase: "optionalTrade" }), {
+      type: "buy",
+      company: "bmw",
+      quantity: 1,
+    });
+    const ended = reduce(first.state, { type: "endTrade" });
+    const bobStarts = reduce(ended.state, { type: "startTrade" });
+    const bobBuys = reduce(bobStarts.state, {
+      type: "buy",
+      company: "bmw",
+      quantity: 1,
+    });
+    const bmwLines = bobBuys.state.log
+      .map((e) => e.text)
+      .filter((line) => /BMW AG/.test(line));
+    expect(bmwLines).toEqual([
+      "Ada buys 1 BMW AG at $100 ($100)",
+      "Bob buys 1 BMW AG at $100 ($100)",
+    ]);
+  });
+
+  it("logs split and wipeout when a Risk resolves them", () => {
+    const risk: Card = {
+      id: "risk-extreme",
+      kind: "risk",
+      title: "Risk 99",
+      text: "",
+      ops: [
+        { type: "delta", company: "bmw", amount: 90 },
+        { type: "delta", company: "bayer", amount: -95 },
+      ],
+    };
+    const state = testState({
+      drawPile: [risk],
+      prices: { commerzbank: 100, bayer: 100, bmw: 200, bp: 100 },
+    });
+    const drawn = reduce(state, { type: "draw" });
+    expect(drawn.ok).toBe(true);
+    expect(drawn.state.log.map((e) => e.text).join("\n")).toBe(
+      "Ada draws Risk 99: BMW AG +90 split $200 → $145 (shares doubled), Bayer -95 wipeout → $100 (shares lost)",
+    );
   });
 });
