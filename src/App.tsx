@@ -36,6 +36,11 @@ import {
   type CardWealthPreview,
 } from "./ui/previewCardWealth";
 import {
+  DEFAULT_PLAYER_COUNT,
+  DEFAULT_SEATS,
+  type SeatDraft,
+} from "./ui/setupDefaults";
+import {
   priceBoardFilledCount,
   priceBoardTicks,
   lastPriceSpan,
@@ -207,25 +212,14 @@ function CardBack({ index }: { index: number }) {
   );
 }
 
-type SeatDraft = {
-  name: string
-  controller: "human" | "ai"
-  strategy: AiStrategy
-};
-
 function Setup({
   onStart,
 }: {
   onStart: (seats: SeatConfig[], roundsTotal: number) => void
 }) {
-  const [count, setCount] = useState(2);
+  const [count, setCount] = useState(DEFAULT_PLAYER_COUNT);
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
-  const [seats, setSeats] = useState<SeatDraft[]>([
-    { name: "Ada", controller: "human", strategy: "wealth" },
-    { name: "Bot", controller: "ai", strategy: "wealth" },
-    { name: "Chen", controller: "human", strategy: "punish" },
-    { name: "Dia", controller: "ai", strategy: "balanced" },
-  ]);
+  const [seats, setSeats] = useState<SeatDraft[]>(DEFAULT_SEATS);
 
   function updateSeat(index: number, patch: Partial<SeatDraft>) {
     setSeats((prev) => {

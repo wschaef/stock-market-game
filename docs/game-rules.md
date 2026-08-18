@@ -6,11 +6,11 @@ This file is the rules source for the digital game. The **Digital rules** sectio
 
 These replace physical-board ambiguities for the browser port.
 
-- **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Investor / Raider / Mixed). AI is deterministic (no LLM) and may take any legal action a human can.
+- **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Investor / Raider / Mixed). AI is deterministic (no LLM) and may take any legal action a human can. Setup defaults to **4 seats**: 1 human, AI Investor, AI Raider, AI Mixed.
 - **Money:** integer dollars. Each player starts with **$1,000**. Note denominations are unused on screen.
 - **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (**9 per player**).
 - **Risk cards:** Only in the draw pile mix (**3 per player**). Leftover cards after dealing/pile construction are unused.
-- **Rounds:** A **round** is one full table cycle (every seat takes one turn). The game lasts a chosen number of rounds (**default 10**, min 1, max 50). After the last seat finishes the final round (including optional post-Risk trade), the game ends.
+- **Rounds:** A **round** is one full table cycle (every seat takes one turn). The game lasts a chosen number of rounds (**default 15**, min 1, max 50). After the last seat finishes the final round (including optional post-Risk trade), the game ends.
 - **Card recycle:** When a card is **played** (Action from hand or Risk from the draw), it is inserted at a **random position** in the remaining draw pile. The next draw is the new top of that pile.
 - **Turn choice:** **Draw** or **Trade only**.
   - **Draw:** reveal the top card **to the current player**. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell. If the draw pile is empty, Draw is not allowed (Trade only).
