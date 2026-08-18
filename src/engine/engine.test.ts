@@ -5,6 +5,7 @@ import { identityShuffle, setupGame } from "./setup";
 import { allowedChoices, reduce } from "./turn";
 import {
   COMPANIES,
+  DEFAULT_ROUNDS,
   type Card,
   type GameState,
   type Player,
@@ -138,6 +139,13 @@ describe("setup", () => {
     expect(state.drawPile).toHaveLength(44);
     expect(state.unusedCards.filter((c) => c.kind === "action")).toHaveLength(0);
     expect(state.unusedCards.filter((c) => c.kind === "risk")).toHaveLength(3);
+  });
+
+  it("defaults to 15 rounds when roundsTotal is omitted", () => {
+    const state = setupGame(["Ada", "Bob"], identityShuffle);
+    expect(DEFAULT_ROUNDS).toBe(15);
+    expect(state.roundsTotal).toBe(15);
+    expect(state.log[0]?.text).toContain("15 rounds");
   });
 });
 

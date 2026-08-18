@@ -17,7 +17,7 @@ export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 export const SPLIT_ABOVE = 250;
 export const WIPEOUT_BELOW = 10;
-export const DEFAULT_ROUNDS = 10;
+export const DEFAULT_ROUNDS = 15;
 export const MIN_ROUNDS = 1;
 export const MAX_ROUNDS = 50;
 
