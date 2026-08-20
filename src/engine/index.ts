@@ -4,7 +4,7 @@ export {
   RISK_CARDS,
   cardById,
 } from "./catalog";
-export { chooseIntent, strategyScoreVector } from "./ai";
+export { chooseIntent, strategyScore, strategyScoreVector } from "./ai";
 export { applyCompanyTarget, netWorth, ranking } from "./price";
 export {
   formatCardOps,

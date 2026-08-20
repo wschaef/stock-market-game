@@ -204,7 +204,7 @@ function advanceTurn(state: GameState): void {
   const next = currentPlayer(state);
   appendLog(
     state,
-    `Turn → ${next.name}${next.controller === "ai" ? ` (AI ${next.strategy ?? "wealth"})` : ""}`,
+    `Turn → ${next.name}${next.controller === "ai" ? ` (AI ${next.strategy ?? "defensive"})` : ""}`,
   );
 }
 

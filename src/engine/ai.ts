@@ -1,12 +1,15 @@
-import { netWorth } from "./price";
+import { applyNamedOps, netWorth } from "./price";
 import { allowedChoices, reduce } from "./turn";
 import {
   COMPANIES,
   type AiStrategy,
   type Card,
+  type CardOp,
+  type ChoiceOp,
   type Company,
   type GameState,
   type Intent,
+  type NamedOp,
 } from "./types";
 
 const TRADE_STEP_CAP = 12;
@@ -21,6 +24,15 @@ const INTENT_PREF: Record<Intent["type"], number> = {
   draw: 6,
 };
 
+export const STRATEGY_WEIGHTS: Record<
+  AiStrategy,
+  { wW: number; wL: number; wC: number; wR: number }
+> = {
+  aggressive: { wW: 1.0, wL: 0.85, wC: 1.15, wR: 0.4 },
+  middle: { wW: 1.0, wL: 0.4, wC: 0.85, wR: 0.95 },
+  defensive: { wW: 1.0, wL: 0, wC: 0.5, wR: 1.55 },
+};
+
 function bestRivalWorth(state: GameState, self: number): number {
   let best = -Infinity;
   for (let i = 0; i < state.players.length; i++) {
@@ -30,37 +42,183 @@ function bestRivalWorth(state: GameState, self: number): number {
   return best;
 }
 
-/** Lexicographic score vector; higher is better at the first differing component. */
+function bestRivalShares(
+  state: GameState,
+  self: number,
+  company: Company,
+): number {
+  let best = 0;
+  for (let i = 0; i < state.players.length; i++) {
+    if (i === self) continue;
+    best = Math.max(best, state.players[i].shares[company]);
+  }
+  return best;
+}
+
+function isChoice(op: CardOp): op is ChoiceOp {
+  return op.type === "deltaChoice" || op.type === "scaleChoice";
+}
+
+function asNamed(op: ChoiceOp, company: Company): NamedOp {
+  if (op.type === "deltaChoice") {
+    return { type: "delta", company, amount: op.amount };
+  }
+  return { type: "scale", company, factor: op.factor };
+}
+
+function assignments(pool: Company[], n: number): Company[][] {
+  if (n === 0) return [[]];
+  if (n > pool.length) return [];
+  const result: Company[][] = [];
+  for (let i = 0; i < pool.length; i += 1) {
+    const pick = pool[i];
+    const rest = pool.filter((_, index) => index !== i);
+    for (const tail of assignments(rest, n - 1)) {
+      result.push([pick, ...tail]);
+    }
+  }
+  return result;
+}
+
+function resolveOpsWays(card: Card): NamedOp[][] {
+  const choiceOps = card.ops.filter(isChoice);
+  if (choiceOps.length === 0) {
+    return [card.ops as NamedOp[]];
+  }
+  const pool = allowedChoices(card);
+  return assignments(pool, choiceOps.length).map((companies) => {
+    let choiceIndex = 0;
+    return card.ops.map((op) => {
+      if (isChoice(op)) {
+        const company = companies[choiceIndex];
+        choiceIndex += 1;
+        return asNamed(op, company);
+      }
+      return op;
+    });
+  });
+}
+
+function cloneForSim(state: GameState): GameState {
+  const { random, ...rest } = state;
+  const next = structuredClone(rest) as GameState;
+  next.random = random;
+  return next;
+}
+
+/** Max non-wipeout Δprice for `company` obtainable by playing any hand card. */
+export function handUpside(
+  state: GameState,
+  self: number,
+  company: Company,
+): number {
+  const hand = state.players[self].hand;
+  let best = 0;
+  for (const card of hand) {
+    for (const ops of resolveOpsWays(card)) {
+      const next = cloneForSim(state);
+      const events = applyNamedOps(next, ops);
+      if (events.some((e) => e.type === "wipeout" && e.company === company)) {
+        continue;
+      }
+      const delta = next.prices[company] - state.prices[company];
+      if (delta > best) best = delta;
+    }
+  }
+  return best;
+}
+
+export function wipeoutHeat(price: number): number {
+  return Math.min(1, Math.max(0, (40 - price) / 30));
+}
+
+export function chanceScore(
+  state: GameState,
+  self: number,
+  options: { includeEntry?: boolean } = {},
+): number {
+  const includeEntry = options.includeEntry ?? true;
+  const player = state.players[self];
+  let chance = 0;
+  for (const company of COMPANIES) {
+    const p = Math.max(state.prices[company], 1);
+    const s = player.shares[company];
+    const r = bestRivalShares(state, self, company);
+    const u = handUpside(state, self, company);
+    // Scale holding synergy below full dollar Δ so it does not outweigh realized wealth
+    // when choosing which card to play (remaining-hand option value).
+    chance += 0.3 * s * u;
+    chance += Math.max(0, s - r) * u;
+    // Entry leverage is for trade decisions; omit when scoring card plays so
+    // deferred pumps do not beat immediately better plays.
+    if (includeEntry) {
+      chance += (player.cash / p) * u * 0.2;
+    }
+  }
+  return chance;
+}
+
+export function riskScore(state: GameState, self: number): number {
+  const player = state.players[self];
+  const w = netWorth(state, self);
+  let wipeoutExposure = 0;
+  let maxPosition = 0;
+  for (const company of COMPANIES) {
+    const price = state.prices[company];
+    const s = player.shares[company];
+    const v = s * price;
+    maxPosition = Math.max(maxPosition, v);
+    const u = handUpside(state, self, company);
+    const orphan = u > 0 ? 0.55 : 1.0;
+    wipeoutExposure += v * wipeoutHeat(price) * orphan;
+  }
+  // Soft concentration — enough to discourage all-in, not enough to reject good pumps.
+  const concentration = 0.35 * w * (maxPosition / Math.max(w, 1)) ** 2;
+  const cashStarvation = Math.max(0, 0.08 * w - player.cash) * 2;
+  return wipeoutExposure + concentration + cashStarvation;
+}
+
+export type ScoreOptions = {
+  /** Include cash×leverage entry term (default true). Off for card-play scoring. */
+  includeEntry?: boolean
+};
+
+/** Higher is better. Shared brain; strategy selects weights only. */
+export function strategyScore(
+  state: GameState,
+  self: number,
+  strategy: AiStrategy,
+  options: ScoreOptions = {},
+): number {
+  const w = netWorth(state, self);
+  const lead = w - bestRivalWorth(state, self);
+  const chance = chanceScore(state, self, {
+    includeEntry: options.includeEntry,
+  });
+  const risk = riskScore(state, self);
+  const { wW, wL, wC, wR } = STRATEGY_WEIGHTS[strategy];
+  return wW * w + wL * lead + wC * chance - wR * risk;
+}
+
+/** @deprecated Use strategyScore; kept as single-element vector for callers. */
 export function strategyScoreVector(
   state: GameState,
   self: number,
   strategy: AiStrategy,
 ): number[] {
-  const w = netWorth(state, self);
-  const rival = bestRivalWorth(state, self);
-  const lead = w - rival;
-  if (strategy === "wealth") return [w, lead];
-  if (strategy === "punish") return [lead, -rival, w];
-  return [w - 0.5 * rival];
+  return [strategyScore(state, self, strategy)];
 }
 
-function compareVectors(a: number[], b: number[]): number {
-  const n = Math.max(a.length, b.length);
-  for (let i = 0; i < n; i++) {
-    const av = a[i] ?? 0;
-    const bv = b[i] ?? 0;
-    if (av !== bv) return av > bv ? 1 : -1;
-  }
-  return 0;
+function compareScores(a: number, b: number): number {
+  if (a === b) return 0;
+  return a > b ? 1 : -1;
 }
 
 function intentTieKey(intent: Intent): (string | number)[] {
   switch (intent.type) {
     case "playCard":
-      // Lower card id preferred (string compare inverted in compareTieKeys).
       return [INTENT_PREF.playCard, intent.cardId];
     case "chooseCompany":
-      // Lower company index preferred.
       return [INTENT_PREF.chooseCompany, -COMPANIES.indexOf(intent.company)];
     case "buy":
       return [
@@ -88,18 +246,17 @@ function compareTieKeys(a: Intent, b: Intent): number {
     const bv = bk[i] ?? 0;
     if (av === bv) continue;
     if (typeof av === "number" && typeof bv === "number") {
-      // Higher key wins (INTENT_PREF; negated company index; larger qty).
       return av > bv ? 1 : -1;
     }
     const as = String(av);
     const bs = String(bv);
-    if (as < bs) return 1; // lower card id preferred
+    if (as < bs) return 1;
     if (as > bs) return -1;
   }
   return 0;
 }
 
-type Scored = { intent: Intent; vector: number[] };
+type Scored = { intent: Intent; score: number };
 
 function pickBest(candidates: Scored[]): Intent {
   if (candidates.length === 0) {
@@ -108,7 +265,7 @@ function pickBest(candidates: Scored[]): Intent {
   let best = candidates[0];
   for (let i = 1; i < candidates.length; i++) {
     const c = candidates[i];
-    const cmp = compareVectors(c.vector, best.vector);
+    const cmp = compareScores(c.score, best.score);
     if (cmp > 0) {
       best = c;
       continue;
@@ -120,10 +277,15 @@ function pickBest(candidates: Scored[]): Intent {
   return best.intent;
 }
 
-function scoreAfter(state: GameState, intent: Intent, strategy: AiStrategy, self: number): number[] | null {
+function scoreAfter(
+  state: GameState,
+  intent: Intent,
+  strategy: AiStrategy,
+  self: number,
+): number | null {
   const result = reduce(state, intent);
   if (!result.ok) return null;
-  return strategyScoreVector(result.state, self, strategy);
+  return strategyScore(result.state, self, strategy, { includeEntry: true });
 }
 
 function uniquePositive(values: number[]): number[] {
@@ -167,7 +329,7 @@ function simulateTradePlanScore(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number[] {
+): number {
   let cursor = state;
   for (let step = 0; step < TRADE_STEP_CAP; step++) {
     if (cursor.phase !== "optionalTrade") break;
@@ -181,41 +343,41 @@ function simulateTradePlanScore(
     const ended = reduce(cursor, { type: "endTrade" });
     if (ended.ok) cursor = ended.state;
   }
-  return strategyScoreVector(cursor, self, strategy);
+  return strategyScore(cursor, self, strategy, { includeEntry: true });
 }
 
 function bestHandPlayScore(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number[] {
+): number {
   const hand = state.players[self].hand;
-  let best: number[] | null = null;
+  let best: number | null = null;
   for (const card of hand) {
-    const vector = scoreCardPlay(state, card, strategy, self);
-    if (!vector) continue;
-    if (!best || compareVectors(vector, best) > 0) best = vector;
+    const score = scoreCardPlay(state, card, strategy, self);
+    if (score === null) continue;
+    if (best === null || score > best) best = score;
   }
-  return best ?? strategyScoreVector(state, self, strategy);
+  return best ?? strategyScore(state, self, strategy, { includeEntry: false });
 }
 
 function scoreThroughChoices(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number[] | null {
+): number | null {
   if (state.phase !== "chooseCompany") {
-    return strategyScoreVector(state, self, strategy);
+    return strategyScore(state, self, strategy, { includeEntry: false });
   }
   const card = state.pendingCard;
   if (!card) return null;
-  let best: number[] | null = null;
+  let best: number | null = null;
   for (const company of allowedChoices(card)) {
     const chosen = reduce(state, { type: "chooseCompany", company });
     if (!chosen.ok) continue;
-    const vector = scoreThroughChoices(chosen.state, strategy, self);
-    if (!vector) continue;
-    if (!best || compareVectors(vector, best) > 0) best = vector;
+    const score = scoreThroughChoices(chosen.state, strategy, self);
+    if (score === null) continue;
+    if (best === null || score > best) best = score;
   }
   return best;
 }
@@ -225,25 +387,28 @@ function scoreCardPlay(
   card: Card,
   strategy: AiStrategy,
   self: number,
-): number[] | null {
+): number | null {
   const played = reduce(state, { type: "playCard", cardId: card.id });
   if (!played.ok) return null;
   return scoreThroughChoices(played.state, strategy, self);
 }
 
-function chooseTurnIntent(state: GameState, strategy: AiStrategy, self: number): Intent {
+function chooseTurnIntent(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): Intent {
   const candidates: Scored[] = [];
 
   if (state.drawPile.length > 0) {
-    // Non-cheating Draw heuristic: value of best play among current hand cards.
-    const drawVec = bestHandPlayScore(state, strategy, self);
-    candidates.push({ intent: { type: "draw" }, vector: drawVec });
+    const drawScore = bestHandPlayScore(state, strategy, self);
+    candidates.push({ intent: { type: "draw" }, score: drawScore });
   }
 
   const tradeStart = reduce(state, { type: "startTrade" });
   if (tradeStart.ok) {
-    const tradeVec = simulateTradePlanScore(tradeStart.state, strategy, self);
-    candidates.push({ intent: { type: "startTrade" }, vector: tradeVec });
+    const tradeScore = simulateTradePlanScore(tradeStart.state, strategy, self);
+    candidates.push({ intent: { type: "startTrade" }, score: tradeScore });
   }
 
   if (candidates.length === 0) {
@@ -252,47 +417,54 @@ function chooseTurnIntent(state: GameState, strategy: AiStrategy, self: number):
   return pickBest(candidates);
 }
 
-function chooseHandCardIntent(state: GameState, strategy: AiStrategy, self: number): Intent {
+function chooseHandCardIntent(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): Intent {
   const hand = state.players[self].hand;
   const scored: Scored[] = [];
   for (const card of hand) {
-    const vector = scoreCardPlay(state, card, strategy, self);
-    if (!vector) continue;
-    scored.push({ intent: { type: "playCard", cardId: card.id }, vector });
+    const score = scoreCardPlay(state, card, strategy, self);
+    if (score === null) continue;
+    scored.push({ intent: { type: "playCard", cardId: card.id }, score });
   }
   return pickBest(scored);
 }
 
-function chooseCompanyIntent(state: GameState, strategy: AiStrategy, self: number): Intent {
+function chooseCompanyIntent(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): Intent {
   const card = state.pendingCard;
   if (!card) throw new Error("AI expected a pending card");
   const scored: Scored[] = [];
   for (const company of allowedChoices(card)) {
     const chosen = reduce(state, { type: "chooseCompany", company });
     if (!chosen.ok) continue;
-    const vector = scoreThroughChoices(chosen.state, strategy, self);
-    if (!vector) continue;
-    scored.push({ intent: { type: "chooseCompany", company }, vector });
+    const score = scoreThroughChoices(chosen.state, strategy, self);
+    if (score === null) continue;
+    scored.push({ intent: { type: "chooseCompany", company }, score });
   }
   return pickBest(scored);
 }
 
-function chooseTradeIntent(state: GameState, strategy: AiStrategy, self: number): Intent {
-  const endVec = strategyScoreVector(state, self, strategy);
+function chooseTradeIntent(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): Intent {
+  const endScore = strategyScore(state, self, strategy, { includeEntry: true });
   const improving: Scored[] = [];
-  const neutralBuys: Scored[] = [];
   for (const intent of enumerateTradeIntents(state)) {
-    const vector = scoreAfter(state, intent, strategy, self);
-    if (!vector) continue;
-    const cmp = compareVectors(vector, endVec);
-    if (cmp > 0) improving.push({ intent, vector });
-    else if (cmp === 0 && intent.type === "buy") {
-      neutralBuys.push({ intent, vector });
+    const score = scoreAfter(state, intent, strategy, self);
+    if (score === null) continue;
+    if (compareScores(score, endScore) > 0) {
+      improving.push({ intent, score });
     }
   }
   if (improving.length > 0) return pickBest(improving);
-  // Fair-price buys leave net worth unchanged; still deploy cash deterministically.
-  if (neutralBuys.length > 0) return pickBest(neutralBuys);
   return { type: "endTrade" };
 }
 
@@ -308,7 +480,7 @@ export function chooseIntent(state: GameState): Intent {
   if (player.controller !== "ai") {
     throw new Error("Current player is not AI");
   }
-  const strategy = player.strategy ?? "wealth";
+  const strategy = player.strategy ?? "defensive";
   const self = state.currentPlayerIndex;
 
   switch (state.phase) {

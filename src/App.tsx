@@ -374,7 +374,7 @@ function Scoreboard({
                 <strong className="score-name">{player.name}</strong>
                 {player.controller === "ai" ? (
                   <span className="ai-pill">
-                    AI · {AI_STRATEGY_LABEL[player.strategy ?? "wealth"]}
+                    AI · {AI_STRATEGY_LABEL[player.strategy ?? "defensive"]}
                   </span>
                 ) : null}
               </div>
@@ -692,7 +692,7 @@ function Board({
           <strong className="turn-name">{player.name}</strong>
           {player.controller === "ai" ? (
             <span className="ai-pill">
-              AI · {AI_STRATEGY_LABEL[player.strategy ?? "wealth"]}
+              AI · {AI_STRATEGY_LABEL[player.strategy ?? "defensive"]}
             </span>
           ) : null}
           <FlashOnChange value={player.cash} className="turn-cash">
