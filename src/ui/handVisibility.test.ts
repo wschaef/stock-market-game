@@ -91,7 +91,7 @@ describe("viewingSeatIndex", () => {
         player("Ada", { controller: "human", hand: [adaAction] }),
         player("Bot", {
           controller: "ai",
-          strategy: "wealth",
+          strategy: "defensive",
           hand: [botAction],
         }),
       ],
@@ -115,7 +115,7 @@ describe("viewingSeatIndex", () => {
     const state = testState({
       players: [
         player("Ada"),
-        player("Bot", { controller: "ai", strategy: "punish" }),
+        player("Bot", { controller: "ai", strategy: "aggressive" }),
         player("Chen"),
       ],
       currentPlayerIndex: 1,
@@ -126,8 +126,8 @@ describe("viewingSeatIndex", () => {
   it("is null in an all-AI game", () => {
     const state = testState({
       players: [
-        player("Bot", { controller: "ai", strategy: "wealth" }),
-        player("Raider", { controller: "ai", strategy: "punish" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
+        player("Raider", { controller: "ai", strategy: "aggressive" }),
       ],
     });
     expect(viewingSeatIndex(state)).toBe(null);
@@ -141,7 +141,7 @@ describe("handPresentation", () => {
         player("Ada", { controller: "human", hand: [adaAction] }),
         player("Bot", {
           controller: "ai",
-          strategy: "wealth",
+          strategy: "defensive",
           hand: [botAction],
         }),
       ],
@@ -163,7 +163,7 @@ describe("handPresentation", () => {
     const state = testState({
       players: [
         player("Ada", { hand: [adaAction] }),
-        player("Bot", { controller: "ai", strategy: "wealth" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
       ],
       currentPlayerIndex: 0,
       phase: "chooseHandCard",
@@ -179,10 +179,10 @@ describe("handPresentation", () => {
       players: [
         player("Bot", {
           controller: "ai",
-          strategy: "wealth",
+          strategy: "defensive",
           hand: [botAction, adaAction],
         }),
-        player("Raider", { controller: "ai", strategy: "punish" }),
+        player("Raider", { controller: "ai", strategy: "aggressive" }),
       ],
       currentPlayerIndex: 0,
     });
@@ -199,7 +199,7 @@ describe("lastDrawnAnnouncement", () => {
     const state = testState({
       players: [
         player("Ada", { controller: "human" }),
-        player("Bot", { controller: "ai", strategy: "wealth" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
       ],
       currentPlayerIndex: 1,
       phase: "optionalTrade",
@@ -220,7 +220,7 @@ describe("lastDrawnAnnouncement", () => {
     const state = testState({
       players: [
         player("Ada", { controller: "human" }),
-        player("Bot", { controller: "ai", strategy: "wealth" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
       ],
       currentPlayerIndex: 1,
       lastDrawn: botAction,
@@ -234,7 +234,7 @@ describe("lastDrawnAnnouncement", () => {
     const state = testState({
       players: [
         player("Ada", { controller: "human" }),
-        player("Bot", { controller: "ai", strategy: "wealth" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
       ],
       currentPlayerIndex: 0,
       lastDrawn: adaAction,
@@ -246,7 +246,7 @@ describe("lastDrawnAnnouncement", () => {
     const state = testState({
       players: [
         player("Ada", { controller: "human" }),
-        player("Bot", { controller: "ai", strategy: "wealth" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
       ],
       currentPlayerIndex: 0,
       phase: "chooseTurn",

@@ -6,7 +6,7 @@ This file is the rules source for the digital game. The **Digital rules** sectio
 
 These replace physical-board ambiguities for the browser port.
 
-- **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Investor / Raider / Mixed). AI is deterministic (no LLM) and may take any legal action a human can. Setup defaults to **4 seats**: 1 human, AI Investor, AI Raider, AI Mixed.
+- **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Aggressive / Middle / Defensive). AI is deterministic (no LLM) and may take any legal action a human can. Setup defaults to **4 seats**: 1 human, AI Defensive, AI Aggressive, AI Middle.
 - **Money:** integer dollars. Each player starts with **$1,000**. Note denominations are unused on screen.
 - **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (**9 per player**).
 - **Risk cards:** Only in the draw pile mix (**3 per player**). Leftover cards after dealing/pile construction are unused.

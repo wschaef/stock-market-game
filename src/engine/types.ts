@@ -21,13 +21,13 @@ export const DEFAULT_ROUNDS = 15;
 export const MIN_ROUNDS = 1;
 export const MAX_ROUNDS = 50;
 
-export const AI_STRATEGIES = ["wealth", "punish", "balanced"] as const;
+export const AI_STRATEGIES = ["aggressive", "middle", "defensive"] as const;
 export type AiStrategy = (typeof AI_STRATEGIES)[number];
 
 export const AI_STRATEGY_LABEL: Record<AiStrategy, string> = {
-  wealth: "Investor",
-  punish: "Raider",
-  balanced: "Mixed",
+  aggressive: "Aggressive",
+  middle: "Middle",
+  defensive: "Defensive",
 };
 
 export type PlayerController = "human" | "ai";

@@ -55,7 +55,7 @@ function resolveStrategy(
   strategy: AiStrategy | null | undefined,
 ): AiStrategy | null {
   if (controller !== "ai") return null;
-  return strategy ?? "wealth";
+  return strategy ?? "defensive";
 }
 
 export function setupGame(
@@ -93,7 +93,10 @@ export function setupGame(
 
   for (const seat of seats) {
     if (seat.controller === "ai" && seat.strategy != null) {
-      const ok = seat.strategy === "wealth" || seat.strategy === "punish" || seat.strategy === "balanced";
+      const ok =
+        seat.strategy === "aggressive" ||
+        seat.strategy === "middle" ||
+        seat.strategy === "defensive";
       if (!ok) throw new Error(`Unknown AI strategy: ${String(seat.strategy)}`);
     }
   }

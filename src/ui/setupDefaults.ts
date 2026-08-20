@@ -9,8 +9,8 @@ export type SeatDraft = {
 };
 
 export const DEFAULT_SEATS: SeatDraft[] = [
-  { name: "Ada", controller: "human", strategy: "wealth" },
-  { name: "Bot", controller: "ai", strategy: "wealth" },
-  { name: "Chen", controller: "ai", strategy: "punish" },
-  { name: "Dia", controller: "ai", strategy: "balanced" },
+  { name: "Ada", controller: "human", strategy: "defensive" },
+  { name: "Bot", controller: "ai", strategy: "defensive" },
+  { name: "Chen", controller: "ai", strategy: "aggressive" },
+  { name: "Dia", controller: "ai", strategy: "middle" },
 ];
