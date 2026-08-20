@@ -2,11 +2,8 @@ import { ACTION_CARDS, RISK_CARDS } from "./catalog";
 import { zeroShares } from "./price";
 import {
   ACTIONS_PER_PLAYER_IN_PILE,
-  DEFAULT_ROUNDS,
   MAX_PLAYERS,
-  MAX_ROUNDS,
   MIN_PLAYERS,
-  MIN_ROUNDS,
   RISKS_PER_PLAYER_IN_PILE,
   STARTING_CASH,
   STARTING_HAND,
@@ -31,9 +28,27 @@ export function fisherYates<T>(items: T[], random: RandomFn = Math.random): T[] 
 
 export const identityShuffle: ShuffleFn = (items) => [...items];
 
+export type PileCounts = {
+  riskCards: number
+  otherCards: number
+};
+
+export function maxOtherCardsForPlayers(playerCount: number): number {
+  return ACTION_CARDS.length - STARTING_HAND * playerCount;
+}
+
+export function defaultPileCounts(playerCount: number): PileCounts {
+  const maxOther = maxOtherCardsForPlayers(playerCount);
+  return {
+    riskCards: RISKS_PER_PLAYER_IN_PILE * playerCount,
+    otherCards: Math.min(ACTIONS_PER_PLAYER_IN_PILE * playerCount, maxOther),
+  };
+}
+
 export type SetupOptions = {
   seats: SeatConfig[]
-  roundsTotal?: number
+  riskCards?: number
+  otherCards?: number
   shuffle?: ShuffleFn
   random?: RandomFn
 };
@@ -58,6 +73,19 @@ function resolveStrategy(
   return strategy ?? "wealth";
 }
 
+function requirePileCount(
+  label: string,
+  value: number,
+  max: number,
+): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be an integer ≥ 0`);
+  }
+  if (value > max) {
+    throw new Error(`${label} cannot exceed ${max}`);
+  }
+}
+
 export function setupGame(
   seatsOrNames: string[] | SeatConfig[] | SetupOptions,
   shuffleArg: ShuffleFn = (items) => fisherYates(items),
@@ -77,15 +105,6 @@ export function setupGame(
     throw new Error(`Need ${MIN_PLAYERS}–${MAX_PLAYERS} players`);
   }
 
-  const roundsTotal = options.roundsTotal ?? DEFAULT_ROUNDS;
-  if (
-    !Number.isInteger(roundsTotal) ||
-    roundsTotal < MIN_ROUNDS ||
-    roundsTotal > MAX_ROUNDS
-  ) {
-    throw new Error(`Rounds must be an integer from ${MIN_ROUNDS} to ${MAX_ROUNDS}`);
-  }
-
   const names = seats.map((seat) => seat.name.trim()).filter(Boolean);
   if (names.length !== seats.length) {
     throw new Error("Player names cannot be empty");
@@ -99,6 +118,17 @@ export function setupGame(
   }
 
   const n = seats.length;
+  const defaults = defaultPileCounts(n);
+  const riskCards = options.riskCards ?? defaults.riskCards;
+  const otherCards = options.otherCards ?? defaults.otherCards;
+  const maxOther = maxOtherCardsForPlayers(n);
+
+  requirePileCount("Risk cards", riskCards, RISK_CARDS.length);
+  requirePileCount("Other cards", otherCards, maxOther);
+  if (riskCards + otherCards < 1) {
+    throw new Error("Draw pile needs at least 1 card (risk + other)");
+  }
+
   const actions = shuffle(ACTION_CARDS.map((card) => ({ ...card })));
   const risks = shuffle(RISK_CARDS.map((card) => ({ ...card })));
 
@@ -112,8 +142,8 @@ export function setupGame(
     strategy: resolveStrategy(seat.controller, seat.strategy),
   }));
 
-  const pileActions = actions.splice(0, ACTIONS_PER_PLAYER_IN_PILE * n);
-  const pileRisks = risks.splice(0, RISKS_PER_PLAYER_IN_PILE * n);
+  const pileActions = actions.splice(0, otherCards);
+  const pileRisks = risks.splice(0, riskCards);
   const drawPile = shuffle([...pileActions, ...pileRisks]);
   const unusedCards: Card[] = [...actions, ...risks];
 
@@ -134,12 +164,10 @@ export function setupGame(
     lastEvents: [],
     lastDrawn: null,
     lastError: null,
-    roundsTotal,
-    roundsCompleted: 0,
     log: [
       {
         id: 0,
-        text: `Game started · ${n} players · ${roundsTotal} round${roundsTotal === 1 ? "" : "s"}`,
+        text: `Game started · ${n} players · ${riskCards} risk · ${otherCards} other`,
       },
     ],
     random,

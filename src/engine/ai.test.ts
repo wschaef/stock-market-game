@@ -54,8 +54,6 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     lastEvents: [],
     lastDrawn: null,
     lastError: null,
-    roundsTotal: 10,
-    roundsCompleted: 0,
     log: [],
     random: () => 0,
     ...overrides,
@@ -208,6 +206,15 @@ describe("AI strategies", () => {
   it("can buy then endTrade on a trade phase", () => {
     let state = testState({
       phase: "optionalTrade",
+      drawPile: [
+        {
+          id: "still-in-pile",
+          kind: "action",
+          title: "filler",
+          text: "",
+          ops: [{ type: "delta", company: "bmw", amount: 0 }],
+        },
+      ],
       players: [
         aiPlayer("Bot", "wealth", {
           cash: 1000,

@@ -76,8 +76,6 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     lastEvents: [],
     lastDrawn: null,
     lastError: null,
-    roundsTotal: 10,
-    roundsCompleted: 0,
     log: [],
     random: () => 0,
     ...overrides,

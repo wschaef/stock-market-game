@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ROUNDS } from "../engine";
-import { DEFAULT_PLAYER_COUNT, DEFAULT_SEATS } from "./setupDefaults";
+import { defaultPileCounts, DEFAULT_PLAYER_COUNT, DEFAULT_SEATS } from "./setupDefaults";
 
 describe("start-game defaults", () => {
   it("opens a 4-seat table: human, AI investor, AI raider, AI mixed", () => {
@@ -13,7 +12,12 @@ describe("start-game defaults", () => {
     ]);
   });
 
-  it("defaults to 15 rounds", () => {
-    expect(DEFAULT_ROUNDS).toBe(15);
+  it("scales risk and other pile defaults by player count", () => {
+    expect(defaultPileCounts(2)).toEqual({ riskCards: 6, otherCards: 18 });
+    expect(defaultPileCounts(3)).toEqual({ riskCards: 9, otherCards: 27 });
+    expect(defaultPileCounts(DEFAULT_PLAYER_COUNT)).toEqual({
+      riskCards: 12,
+      otherCards: 32,
+    });
   });
 });
