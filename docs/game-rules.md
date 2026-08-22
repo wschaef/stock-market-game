@@ -8,10 +8,10 @@ These replace physical-board ambiguities for the browser port.
 
 - **Players:** 2–4, hotseat, clockwise, player 1 starts. Each seat is **human** or **AI** (Aggressive / Middle / Defensive). AI is deterministic (no LLM) and may take any legal action a human can. Setup defaults to **4 seats**: 1 human, AI Defensive, AI Aggressive, AI Middle.
 - **Money:** integer dollars. Each player starts with **$1,000**. Note denominations are unused on screen.
-- **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (**9 per player**).
-- **Risk cards:** Only in the draw pile mix (**3 per player**). Leftover cards after dealing/pile construction are unused.
-- **Rounds:** A **round** is one full table cycle (every seat takes one turn). The game lasts a chosen number of rounds (**default 15**, min 1, max 50). After the last seat finishes the final round (including optional post-Risk trade), the game ends.
-- **Card recycle:** When a card is **played** (Action from hand or Risk from the draw), it is inserted at a **random position** in the remaining draw pile. The next draw is the new top of that pile.
+- **Action cards:** Standard, +100, and Multiplier. Dealt to hands and mixed into the draw pile (defaults **9 per player**, capped by leftover Actions after dealing).
+- **Risk cards:** Only in the draw pile mix (defaults **3 per player**). Leftover cards after dealing/pile construction are unused.
+- **Pile size:** On the start menu, choose **Risk cards** and **Other cards** (Action cards in the pile). Changing player count resets both to the defaults for that seat count.
+- **Finite deck:** When a card is **played** (Action from hand or Risk from the draw), it goes to the **discard pile**. It does **not** return to the draw pile.
 - **Turn choice:** **Draw** or **Trade only**.
   - **Draw:** reveal the top card **to the current player**. If **Action**, add it to the hand (now 5) and **must play one** card. If **Risk**, play it immediately, then the player **may** buy and/or sell. If the draw pile is empty, Draw is not allowed (Trade only).
 - **Hidden hands:** Other seats’ unplayed cards stay face-down. A drawn Action is private until played; a drawn Risk is public.
@@ -25,7 +25,7 @@ These replace physical-board ambiguities for the browser port.
 - Multiplier **1/2** uses integer **floor**, then the split/wipeout checks.
 - Effects on a card apply **per company independently**. Risk cards that omit a company treat it as **+0**.
 - **Trading:** share supply is unlimited. Cannot sell more than you hold or spend more cash than you have.
-- **End:** when the configured rounds are complete, score  
+- **End:** when the draw pile is empty, the current player finishes their turn (play Action / optional trade after Risk or Trade-only). Then the game ends and score  
   `net worth = sum(shares[company] × price[company]) + cash`. Highest wins; ties allowed.
 
 ---

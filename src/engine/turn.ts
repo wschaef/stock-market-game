@@ -102,16 +102,6 @@ export function bindNextChoice(card: Card, company: Company): Card | string {
   return { ...card, ops };
 }
 
-export function insertAtRandom(
-  pile: Card[],
-  card: Card,
-  random: () => number,
-): number {
-  const index = Math.floor(random() * (pile.length + 1));
-  pile.splice(index, 0, card);
-  return index;
-}
-
 function nextLogId(state: GameState): number {
   return state.log.reduce((max, entry) => Math.max(max, entry.id), -1) + 1;
 }
@@ -184,19 +174,10 @@ function upsertTradeLog(
 
 function advanceTurn(state: GameState): void {
   state.pendingCard = null;
-  const finishedIndex = state.currentPlayerIndex;
-  const completedRound = finishedIndex === state.players.length - 1;
-  if (completedRound) {
-    state.roundsCompleted += 1;
-    appendLog(
-      state,
-      `Round ${state.roundsCompleted} of ${state.roundsTotal} complete`,
-    );
-    if (state.roundsCompleted >= state.roundsTotal) {
-      state.phase = "gameOver";
-      appendLog(state, "Game over");
-      return;
-    }
+  if (state.drawPile.length === 0) {
+    state.phase = "gameOver";
+    appendLog(state, "Game over — draw pile empty");
+    return;
   }
   state.currentPlayerIndex =
     (state.currentPlayerIndex + 1) % state.players.length;
@@ -208,13 +189,13 @@ function advanceTurn(state: GameState): void {
   );
 }
 
-/** Apply a fully-bound card and recycle it into the draw pile. */
+/** Apply a fully-bound card and move it to the discard pile. */
 function applyResolvedCard(state: GameState, card: Card): void {
   if (hasChoice(card.ops)) {
     throw new Error("Card still has unbound company choices.");
   }
   state.lastEvents = applyNamedOps(state, card.ops as NamedOp[]);
-  insertAtRandom(state.drawPile, card, state.random);
+  state.discardPile.push(card);
   state.pendingCard = null;
 }
 

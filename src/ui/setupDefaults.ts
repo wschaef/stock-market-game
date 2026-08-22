@@ -1,4 +1,5 @@
 import type { AiStrategy } from "../engine";
+import { defaultPileCounts } from "../engine";
 
 export const DEFAULT_PLAYER_COUNT = 4;
 
@@ -14,3 +15,5 @@ export const DEFAULT_SEATS: SeatDraft[] = [
   { name: "Chen", controller: "ai", strategy: "aggressive" },
   { name: "Dia", controller: "ai", strategy: "middle" },
 ];
+
+export { defaultPileCounts };

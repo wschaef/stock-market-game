@@ -17,9 +17,6 @@ export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 export const SPLIT_ABOVE = 250;
 export const WIPEOUT_BELOW = 10;
-export const DEFAULT_ROUNDS = 15;
-export const MIN_ROUNDS = 1;
-export const MAX_ROUNDS = 50;
 
 export const AI_STRATEGIES = ["aggressive", "middle", "defensive"] as const;
 export type AiStrategy = (typeof AI_STRATEGIES)[number];
@@ -108,8 +105,6 @@ export type GameState = {
   lastEvents: GameEvent[]
   lastDrawn: Card | null
   lastError: string | null
-  roundsTotal: number
-  roundsCompleted: number
   log: GameLogEntry[]
   random: RandomFn
 };

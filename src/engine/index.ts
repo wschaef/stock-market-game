@@ -11,11 +11,15 @@ export {
   formatRiskHeadline,
   formatTradeLine,
 } from "./logFormat";
-export { identityShuffle, setupGame } from "./setup";
+export {
+  defaultPileCounts,
+  identityShuffle,
+  maxOtherCardsForPlayers,
+  setupGame,
+} from "./setup";
 export {
   allowedChoices,
   canTrade,
-  insertAtRandom,
   nextChoicePrompt,
   reduce,
 } from "./turn";
@@ -24,9 +28,6 @@ export {
   AI_STRATEGY_LABEL,
   COMPANY_LABEL,
   COMPANIES,
-  DEFAULT_ROUNDS,
-  MAX_ROUNDS,
-  MIN_ROUNDS,
   type AiStrategy,
   type Card,
   type Company,

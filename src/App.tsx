@@ -4,12 +4,12 @@ import {
   AI_STRATEGY_LABEL,
   COMPANY_LABEL,
   COMPANIES,
-  DEFAULT_ROUNDS,
-  MAX_ROUNDS,
-  MIN_ROUNDS,
+  RISK_CARDS,
   allowedChoices,
   canTrade,
   chooseIntent,
+  defaultPileCounts,
+  maxOtherCardsForPlayers,
   netWorth,
   nextChoicePrompt,
   ranking,
@@ -215,11 +215,20 @@ function CardBack({ index }: { index: number }) {
 function Setup({
   onStart,
 }: {
-  onStart: (seats: SeatConfig[], roundsTotal: number) => void
+  onStart: (
+    seats: SeatConfig[],
+    pile: { riskCards: number; otherCards: number },
+  ) => void
 }) {
   const [count, setCount] = useState(DEFAULT_PLAYER_COUNT);
-  const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
+  const initialPile = defaultPileCounts(DEFAULT_PLAYER_COUNT);
+  const [riskCards, setRiskCards] = useState(initialPile.riskCards);
+  const [otherCards, setOtherCards] = useState(initialPile.otherCards);
   const [seats, setSeats] = useState<SeatDraft[]>(DEFAULT_SEATS);
+
+  const maxOther = maxOtherCardsForPlayers(count);
+  const maxRisk = RISK_CARDS.length;
+  const defaults = defaultPileCounts(count);
 
   function updateSeat(index: number, patch: Partial<SeatDraft>) {
     setSeats((prev) => {
@@ -229,6 +238,13 @@ function Setup({
     });
   }
 
+  function setPlayerCount(nextCount: number) {
+    setCount(nextCount);
+    const defaults = defaultPileCounts(nextCount);
+    setRiskCards(defaults.riskCards);
+    setOtherCards(defaults.otherCards);
+  }
+
   return (
     <div className="shell setup-shell">
       <header className="brand-block">
@@ -236,7 +252,8 @@ function Setup({
         <h1>Hotseat market</h1>
         <p className="lede">
           Draw or trade on one device. Mix human and AI seats. You cannot trade
-          after an Action card — only after a Risk, or on a Trade-only turn.
+          after an Action card — only after a Risk, or on a Trade-only turn. The
+          game ends when the draw pile is empty.
         </p>
       </header>
 
@@ -244,7 +261,7 @@ function Setup({
         Players
         <select
           value={count}
-          onChange={(e) => setCount(Number(e.target.value))}
+          onChange={(e) => setPlayerCount(Number(e.target.value))}
         >
           <option value={2}>2</option>
           <option value={3}>3</option>
@@ -253,23 +270,46 @@ function Setup({
       </label>
 
       <label className="field">
-        Rounds
+        Risk cards
         <input
           type="number"
-          min={MIN_ROUNDS}
-          max={MAX_ROUNDS}
-          value={rounds}
+          min={0}
+          max={maxRisk}
+          value={riskCards}
           onChange={(e) =>
-            setRounds(
+            setRiskCards(
               Math.min(
-                MAX_ROUNDS,
-                Math.max(MIN_ROUNDS, Number(e.target.value) || MIN_ROUNDS),
+                maxRisk,
+                Math.max(0, Number(e.target.value) || 0),
               ),
             )
           }
         />
         <span className="field-hint">
-          One round = each seat takes one turn ({MIN_ROUNDS}–{MAX_ROUNDS})
+          In the draw pile (0–{maxRisk}; default {defaults.riskCards} for {count}{" "}
+          players)
+        </span>
+      </label>
+
+      <label className="field">
+        Other cards
+        <input
+          type="number"
+          min={0}
+          max={maxOther}
+          value={otherCards}
+          onChange={(e) =>
+            setOtherCards(
+              Math.min(
+                maxOther,
+                Math.max(0, Number(e.target.value) || 0),
+              ),
+            )
+          }
+        />
+        <span className="field-hint">
+          Action cards in the draw pile (0–{maxOther}; default {defaults.otherCards}{" "}
+          for {count} players)
         </span>
       </label>
 
@@ -330,7 +370,7 @@ function Setup({
               controller: seat.controller,
               strategy: seat.controller === "ai" ? seat.strategy : null,
             })),
-            rounds,
+            { riskCards, otherCards },
           )
         }
       >
@@ -676,10 +716,6 @@ function Board({
           <span className="pile-chip" title="Cards left in draw pile">
             Pile {state.drawPile.length}
           </span>
-          <span className="pile-chip" title="Rounds completed of total">
-            Round {Math.min(state.roundsCompleted + 1, state.roundsTotal)} /{" "}
-            {state.roundsTotal}
-          </span>
           <button type="button" className="secondary" onClick={onReset}>
             New game
           </button>
@@ -845,9 +881,15 @@ export function App() {
   if (!state) {
     return (
       <Setup
-        onStart={(seats, roundsTotal) => {
+        onStart={(seats, pile) => {
           try {
-            setState(setupGame({ seats, roundsTotal }));
+            setState(
+              setupGame({
+                seats,
+                riskCards: pile.riskCards,
+                otherCards: pile.otherCards,
+              }),
+            );
           } catch (error) {
             alert(error instanceof Error ? error.message : "Could not start");
           }

@@ -3,13 +3,8 @@ import { ACTION_CARDS, ALL_CARDS, RISK_CARDS } from "./catalog";
 import { applyCompanyTarget, netWorth, ranking } from "./price";
 import { identityShuffle, setupGame } from "./setup";
 import { allowedChoices, reduce } from "./turn";
-import {
-  COMPANIES,
-  DEFAULT_ROUNDS,
-  type Card,
-  type GameState,
-  type Player,
-} from "./types";
+import { COMPANIES, type Card, type GameState, type Player } from "./types";
+import { defaultPileCounts } from "./setup";
 
 function emptyShares() {
   return { commerzbank: 0, bayer: 0, bmw: 0, bp: 0 };
@@ -30,7 +25,16 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     players: [player("Ada"), player("Bob")],
     currentPlayerIndex: 0,
     prices: { commerzbank: 100, bayer: 100, bmw: 100, bp: 100 },
-    drawPile: [],
+    // Non-empty by default so turn advances do not end the game mid-suite.
+    drawPile: [
+      {
+        id: "filler",
+        kind: "action",
+        title: "filler",
+        text: "",
+        ops: [{ type: "delta", company: "bmw", amount: 0 }],
+      },
+    ],
     discardPile: [],
     unusedCards: [],
     phase: "chooseTurn",
@@ -38,8 +42,6 @@ function testState(overrides: Partial<GameState> = {}): GameState {
     lastEvents: [],
     lastDrawn: null,
     lastError: null,
-    roundsTotal: 10,
-    roundsCompleted: 0,
     log: [],
     random: () => 0,
     ...overrides,
@@ -112,7 +114,13 @@ describe("catalog", () => {
 });
 
 describe("setup", () => {
-  it("deals 4 action cards each and builds 9 action + 3 risk per player", () => {
+  it("defaultPileCounts scales with player count and caps 4p other at leftover actions", () => {
+    expect(defaultPileCounts(2)).toEqual({ riskCards: 6, otherCards: 18 });
+    expect(defaultPileCounts(3)).toEqual({ riskCards: 9, otherCards: 27 });
+    expect(defaultPileCounts(4)).toEqual({ riskCards: 12, otherCards: 32 });
+  });
+
+  it("deals 4 action cards each and builds default 9 action + 3 risk per player", () => {
     const state = setupGame(["Ada", "Bob"], identityShuffle);
     expect(state.players).toHaveLength(2);
     expect(state.players.every((p) => p.cash === 1000)).toBe(true);
@@ -127,9 +135,11 @@ describe("setup", () => {
     expect(pileRisks).toHaveLength(6);
     expect(state.unusedCards).toHaveLength(63 - 8 - 24);
     expect(state.phase).toBe("chooseTurn");
+    expect(state.log[0]?.text).toContain("6 risk");
+    expect(state.log[0]?.text).toContain("18 other");
   });
 
-  it("for 4 players puts all leftover actions in the pile (32) with 12 risks", () => {
+  it("for 4 players defaults to 32 leftover actions and 12 risks", () => {
     const state = setupGame(["Ada", "Bob", "Cara", "Dan"], identityShuffle);
     expect(state.players.every((p) => p.hand.length === 4)).toBe(true);
     const pileActions = state.drawPile.filter((c) => c.kind === "action");
@@ -141,11 +151,38 @@ describe("setup", () => {
     expect(state.unusedCards.filter((c) => c.kind === "risk")).toHaveLength(3);
   });
 
-  it("defaults to 15 rounds when roundsTotal is omitted", () => {
-    const state = setupGame(["Ada", "Bob"], identityShuffle);
-    expect(DEFAULT_ROUNDS).toBe(15);
-    expect(state.roundsTotal).toBe(15);
-    expect(state.log[0]?.text).toContain("15 rounds");
+  it("honors explicit riskCards and otherCards", () => {
+    const state = setupGame({
+      seats: [
+        { name: "Ada", controller: "human" },
+        { name: "Bob", controller: "human" },
+      ],
+      riskCards: 2,
+      otherCards: 5,
+      shuffle: identityShuffle,
+    });
+    expect(state.drawPile.filter((c) => c.kind === "risk")).toHaveLength(2);
+    expect(state.drawPile.filter((c) => c.kind === "action")).toHaveLength(5);
+    expect(state.drawPile).toHaveLength(7);
+  });
+
+  it("rejects invalid pile counts", () => {
+    const seats = [
+      { name: "Ada", controller: "human" as const },
+      { name: "Bob", controller: "human" as const },
+    ];
+    expect(() =>
+      setupGame({ seats, riskCards: -1, otherCards: 5, shuffle: identityShuffle }),
+    ).toThrow(/risk/i);
+    expect(() =>
+      setupGame({ seats, riskCards: 0, otherCards: 0, shuffle: identityShuffle }),
+    ).toThrow(/at least 1/i);
+    expect(() =>
+      setupGame({ seats, riskCards: 16, otherCards: 1, shuffle: identityShuffle }),
+    ).toThrow(/risk/i);
+    expect(() =>
+      setupGame({ seats, riskCards: 1, otherCards: 41, shuffle: identityShuffle }),
+    ).toThrow(/other/i);
   });
 });
 
@@ -489,10 +526,10 @@ describe("scoring and end", () => {
     expect(netWorth(state, 0)).toBe(400 + 240 + 80);
   });
 
-  it("ends after the configured number of full table rounds", () => {
+  it("ends when the draw pile is empty after the current turn finishes", () => {
     const state = testState({
-      roundsTotal: 1,
       phase: "optionalTrade",
+      drawPile: [],
       players: [
         {
           id: "p1",
@@ -515,18 +552,22 @@ describe("scoring and end", () => {
       ],
     });
     const afterAda = reduce(state, { type: "endTrade" });
-    expect(afterAda.state.phase).toBe("chooseTurn");
-    expect(afterAda.state.currentPlayerIndex).toBe(1);
-    expect(afterAda.state.roundsCompleted).toBe(0);
-
-    const bobTrade = reduce(afterAda.state, { type: "startTrade" });
-    expect(bobTrade.ok).toBe(true);
-    const afterBob = reduce(bobTrade.state, { type: "endTrade" });
-    expect(afterBob.state.roundsCompleted).toBe(1);
-    expect(afterBob.state.phase).toBe("gameOver");
-    const board = ranking(afterBob.state);
+    expect(afterAda.state.phase).toBe("gameOver");
+    const board = ranking(afterAda.state);
     expect(board[0].name).toBe("Ada");
     expect(board[0].netWorth).toBeGreaterThan(board[1].netWorth);
+  });
+
+  it("lets the player finish optional trade after drawing the last Risk, then ends", () => {
+    const state = testState({ drawPile: [riskNoChoice] });
+    const drawn = reduce(state, { type: "draw" });
+    expect(drawn.ok).toBe(true);
+    expect(drawn.state.phase).toBe("optionalTrade");
+    expect(drawn.state.drawPile).toHaveLength(0);
+    expect(drawn.state.discardPile.map((c) => c.id)).toEqual(["risk-test"]);
+
+    const ended = reduce(drawn.state, { type: "endTrade" });
+    expect(ended.state.phase).toBe("gameOver");
   });
 
   it("rejects draw when the pile is empty", () => {
@@ -537,8 +578,8 @@ describe("scoring and end", () => {
   });
 });
 
-describe("card recycle", () => {
-  it("re-inserts a played Action at a random draw-pile index", () => {
+describe("finite deck (no recycle)", () => {
+  it("sends a played Action to discard and does not return it to the draw pile", () => {
     const other: Card = {
       id: "other",
       kind: "action",
@@ -546,11 +587,9 @@ describe("card recycle", () => {
       text: "",
       ops: [{ type: "delta", company: "bmw", amount: 10 }],
     };
-    // random → 0.99 ⇒ insert index = floor(0.99 * 2) = 1 among 1 remaining + slot
     const state = testState({
       phase: "chooseHandCard",
       drawPile: [other],
-      random: () => 0.99,
       players: [
         {
           id: "p1",
@@ -574,23 +613,19 @@ describe("card recycle", () => {
     });
     const played = reduce(state, { type: "playCard", cardId: "p100-test" });
     expect(played.ok).toBe(true);
-    expect(played.state.discardPile).toHaveLength(0);
-    expect(played.state.drawPile).toHaveLength(2);
-    expect(played.state.drawPile.map((c) => c.id)).toEqual([
-      "other",
-      "p100-test",
-    ]);
+    expect(played.state.discardPile.map((c) => c.id)).toEqual(["p100-test"]);
+    expect(played.state.drawPile.map((c) => c.id)).toEqual(["other"]);
   });
 
-  it("re-inserts a resolved Risk into the draw pile", () => {
+  it("sends a resolved Risk to discard", () => {
     const state = testState({
-      drawPile: [riskNoChoice],
-      random: () => 0,
+      drawPile: [riskNoChoice, actionNoChoice],
     });
     const drawn = reduce(state, { type: "draw" });
     expect(drawn.ok).toBe(true);
     expect(drawn.state.phase).toBe("optionalTrade");
-    expect(drawn.state.drawPile.map((c) => c.id)).toEqual(["risk-test"]);
+    expect(drawn.state.discardPile.map((c) => c.id)).toEqual(["risk-test"]);
+    expect(drawn.state.drawPile.map((c) => c.id)).toEqual(["p100-test"]);
   });
 });
 
