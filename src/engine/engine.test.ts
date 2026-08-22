@@ -166,6 +166,37 @@ describe("setup", () => {
     expect(state.drawPile).toHaveLength(7);
   });
 
+  it("keeps seat order when random preserves fisherYates order", () => {
+    const state = setupGame({
+      seats: [
+        { name: "Ada", controller: "human" },
+        { name: "Bob", controller: "human" },
+        { name: "Cara", controller: "human" },
+        { name: "Dan", controller: "human" },
+      ],
+      shuffle: identityShuffle,
+      random: () => 0.99,
+    });
+    expect(state.players.map((p) => p.name)).toEqual(["Ada", "Bob", "Cara", "Dan"]);
+    expect(state.currentPlayerIndex).toBe(0);
+  });
+
+  it("shuffles player turn order at game start", () => {
+    const state = setupGame({
+      seats: [
+        { name: "Ada", controller: "human" },
+        { name: "Bob", controller: "human" },
+        { name: "Cara", controller: "human" },
+        { name: "Dan", controller: "human" },
+      ],
+      shuffle: identityShuffle,
+      random: () => 0,
+    });
+    expect(state.players.map((p) => p.name)).toEqual(["Bob", "Cara", "Dan", "Ada"]);
+    expect(state.currentPlayerIndex).toBe(0);
+    expect(state.players[0].name).toBe("Bob");
+  });
+
   it("rejects invalid pile counts", () => {
     const seats = [
       { name: "Ada", controller: "human" as const },

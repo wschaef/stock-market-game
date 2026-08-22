@@ -135,9 +135,10 @@ export function setupGame(
   const actions = shuffle(ACTION_CARDS.map((card) => ({ ...card })));
   const risks = shuffle(RISK_CARDS.map((card) => ({ ...card })));
 
-  const players = seats.map((seat, index) => ({
+  const orderedSeats = fisherYates(seats, random);
+  const players = orderedSeats.map((seat, index) => ({
     id: `p${index + 1}`,
-    name: names[index],
+    name: seat.name.trim(),
     cash: STARTING_CASH,
     shares: zeroShares(),
     hand: actions.splice(0, STARTING_HAND),
