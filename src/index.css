@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   --felt-0: #1a4a3c;
   --felt-1: #12352c;
   --felt-2: #0d2922;
@@ -232,6 +232,15 @@ h2 {
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
   background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+
+.field select {
+  color-scheme: dark;
+}
+
+.field select option {
+  background-color: var(--felt-1);
   color: var(--ink);
 }
 
