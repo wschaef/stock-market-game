@@ -3,6 +3,7 @@ import type { Card, GameState, Player } from "../engine/types";
 import {
   handPresentation,
   lastDrawnAnnouncement,
+  lastDrawnView,
   viewingSeatIndex,
 } from "./handVisibility";
 
@@ -188,6 +189,52 @@ describe("handPresentation", () => {
       mode: "hidden",
       ownerName: "Bot",
       count: 2,
+    });
+  });
+});
+
+describe("lastDrawnView", () => {
+  it("shows a Risk with card details during optional trade", () => {
+    const state = testState({
+      phase: "optionalTrade",
+      lastDrawn: riskCard,
+    });
+    expect(lastDrawnView(state)).toEqual({
+      visible: true,
+      hidden: false,
+      card: riskCard,
+    });
+  });
+
+  it("hides an Action when the owner is not the local viewer", () => {
+    const state = testState({
+      players: [
+        player("Ada", { controller: "human" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
+      ],
+      currentPlayerIndex: 1,
+      lastDrawn: botAction,
+    });
+    expect(lastDrawnView(state)).toEqual({
+      visible: true,
+      hidden: true,
+      message: "An Action was drawn (hidden).",
+    });
+  });
+
+  it("shows an Action drawn by the viewing human", () => {
+    const state = testState({
+      players: [
+        player("Ada", { controller: "human" }),
+        player("Bot", { controller: "ai", strategy: "defensive" }),
+      ],
+      currentPlayerIndex: 0,
+      lastDrawn: adaAction,
+    });
+    expect(lastDrawnView(state)).toEqual({
+      visible: true,
+      hidden: false,
+      card: adaAction,
     });
   });
 });
