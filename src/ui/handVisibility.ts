@@ -59,18 +59,33 @@ export function handPresentation(state: GameState): HandPresentation {
   };
 }
 
-export function lastDrawnAnnouncement(state: GameState): string | null {
+export type LastDrawnView =
+  | { visible: false }
+  | { visible: true; hidden: true; message: string }
+  | { visible: true; hidden: false; card: Card };
+
+export function lastDrawnView(state: GameState): LastDrawnView {
   const card = state.lastDrawn;
-  if (!card) return null;
+  if (!card) return { visible: false };
   if (card.kind === "risk") {
     return state.phase === "optionalTrade"
-      ? `Last drawn: ${formatRiskHeadline(card, state.lastEvents)}`
-      : null;
+      ? { visible: true, hidden: false, card }
+      : { visible: false };
   }
-  if (state.phase !== "chooseHandCard") return null;
+  if (state.phase !== "chooseHandCard") return { visible: false };
   const viewer = viewingSeatIndex(state);
   if (viewer !== null && viewer === state.currentPlayerIndex) {
-    return `Last drawn: ${card.title}`;
+    return { visible: true, hidden: false, card };
   }
-  return "An Action was drawn (hidden).";
+  return { visible: true, hidden: true, message: "An Action was drawn (hidden)." };
+}
+
+export function lastDrawnAnnouncement(state: GameState): string | null {
+  const view = lastDrawnView(state);
+  if (!view.visible) return null;
+  if (view.hidden) return view.message;
+  if (view.card.kind === "risk") {
+    return `Last drawn: ${formatRiskHeadline(view.card, state.lastEvents)}`;
+  }
+  return `Last drawn: ${view.card.title}`;
 }

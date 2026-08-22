@@ -325,15 +325,32 @@ h2 {
 .board-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.9fr);
+  grid-template-rows: auto auto;
   gap: 1rem;
   align-items: start;
+}
+
+.market-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.last-drawn-panel {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.scoreboard-panel {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .market-panel,
 .scoreboard-panel,
 .hand-panel,
 .picker-panel,
-.game-over-panel {
+.game-over-panel,
+.last-drawn-panel {
   margin: 0;
   padding: 1rem 1.05rem 1.1rem;
   border: 1px solid var(--line);
@@ -342,6 +359,61 @@ h2 {
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow);
   animation: rise 380ms ease both;
+}
+
+.last-drawn-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(165deg, #fffdf8 0%, #efe6d4 100%);
+  color: var(--ink-deep);
+  border-color: rgba(16, 32, 24, 0.18);
+}
+
+.last-drawn-panel-hidden {
+  background: var(--surface);
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.last-drawn-label {
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  color: #5a6b5f;
+  font-weight: 650;
+}
+
+.last-drawn-hidden {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.last-drawn-effects {
+  flex: 1 1 auto;
+  min-width: min(100%, 12rem);
+}
+
+.last-drawn-kind {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.last-drawn-panel .effect-rows {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  grid-template-columns: none;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.last-drawn-panel .risk-strip {
+  grid-template-columns: repeat(4, max-content);
+  gap: 0.55rem 0.75rem;
 }
 
 .hand-panel,
@@ -975,6 +1047,18 @@ h2 {
 @media (max-width: 860px) {
   .board-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .market-panel,
+  .last-drawn-panel,
+  .scoreboard-panel {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .last-drawn-panel .risk-strip {
+    grid-template-columns: repeat(2, max-content);
   }
 
   .turn-banner {

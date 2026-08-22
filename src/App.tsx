@@ -28,9 +28,9 @@ import { CompanyMark } from "./ui/CompanyMark";
 import { FlashOnChange } from "./ui/FlashOnChange";
 import {
   handPresentation,
-  lastDrawnAnnouncement,
   type HandPresentation,
 } from "./ui/handVisibility";
+import { LastDrawnStrip } from "./ui/LastDrawnStrip";
 import {
   previewCardWealth,
   type CardWealthPreview,
@@ -705,7 +705,6 @@ function Board({
       ? player.hand.find((card) => card.id === previewCardId) ?? null
       : null;
   const preview = previewCard ? previewCardWealth(state, previewCard) : null;
-  const drawnLine = lastDrawnAnnouncement(state);
   const cards = handPresentation(state);
 
   return (
@@ -743,11 +742,6 @@ function Board({
           {line}
         </p>
       ))}
-      {drawnLine ? (
-        <p className="drawn" key={drawnLine}>
-          {drawnLine}
-        </p>
-      ) : null}
 
       <div className="board-grid">
         <MarketDiagram
@@ -759,6 +753,7 @@ function Board({
           onSell={(company) => act({ type: "sell", company, quantity: qty })}
           onEndTrade={() => act({ type: "endTrade" })}
         />
+        <LastDrawnStrip state={state} />
         {state.phase !== "gameOver" ? (
           <Scoreboard state={state} preview={preview} />
         ) : null}
