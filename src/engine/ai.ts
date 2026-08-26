@@ -14,6 +14,31 @@ import {
 
 const TRADE_STEP_CAP = 12;
 
+// #region agent log
+type DebugGlobal = typeof globalThis & { __AI_DEBUG_LOGS__?: string[] };
+function dbg(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown> = {},
+): void {
+  const line = `${JSON.stringify({ hypothesisId, location, message, data, timestamp: Date.now() })}\n`;
+  const g = globalThis as DebugGlobal;
+  if (!g.__AI_DEBUG_LOGS__) g.__AI_DEBUG_LOGS__ = [];
+  g.__AI_DEBUG_LOGS__.push(line);
+}
+/** Drain in-memory NDJSON lines (for vitest repro → /opt/cursor/logs/debug.log). */
+export function drainAiDebugLogs(): string {
+  const g = globalThis as DebugGlobal;
+  const lines = g.__AI_DEBUG_LOGS__ ?? [];
+  g.__AI_DEBUG_LOGS__ = [];
+  return lines.join("");
+}
+export function flushAiDebugLogs(): void {
+  /* kept for repro API compatibility; drainAiDebugLogs is the real sink */
+}
+// #endregion
+
 const INTENT_PREF: Record<Intent["type"], number> = {
   endTrade: 0,
   sell: 1,
@@ -148,7 +173,9 @@ export function chanceScore(
     // Scale holding synergy below full dollar Δ so it does not outweigh realized wealth
     // when choosing which card to play (remaining-hand option value).
     chance += 0.3 * s * u;
-    chance += Math.max(0, s - r) * u;
+    // Share-lead synergy is also scaled: at 1.0 * (s−r) * U, unrealized option
+    // value outweighs realizing the same Δ via playCard (Trade-only deferral).
+    chance += 0.3 * Math.max(0, s - r) * u;
     // Entry leverage is for trade decisions; omit when scoring card plays so
     // deferred pumps do not beat immediately better plays.
     if (includeEntry) {
@@ -258,8 +285,13 @@ function compareTieKeys(a: Intent, b: Intent): number {
 
 type Scored = { intent: Intent; score: number };
 
-function pickBest(candidates: Scored[]): Intent {
+function pickBest(candidates: Scored[], context?: string): Intent {
   if (candidates.length === 0) {
+    // #region agent log
+    dbg("H2", "ai.ts:pickBest", "empty candidates — will throw", {
+      context: context ?? "unknown",
+    });
+    // #endregion
     throw new Error("AI has no legal intents");
   }
   let best = candidates[0];
@@ -325,11 +357,11 @@ function enumerateTradeIntents(state: GameState): Intent[] {
   return intents;
 }
 
-function simulateTradePlanScore(
+function simulateTradePlan(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number {
+): GameState {
   let cursor = state;
   for (let step = 0; step < TRADE_STEP_CAP; step++) {
     if (cursor.phase !== "optionalTrade") break;
@@ -343,22 +375,35 @@ function simulateTradePlanScore(
     const ended = reduce(cursor, { type: "endTrade" });
     if (ended.ok) cursor = ended.state;
   }
-  return strategyScore(cursor, self, strategy, { includeEntry: true });
+  return cursor;
 }
 
-function bestHandPlayScore(
+/** Best post-play strategy score / wealth from the current hand (lookahead). */
+type HandPlayBest = { score: number; wealth: number };
+
+function bestHandPlay(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number {
+): HandPlayBest {
   const hand = state.players[self].hand;
-  let best: number | null = null;
+  let best: HandPlayBest | null = null;
   for (const card of hand) {
-    const score = scoreCardPlay(state, card, strategy, self);
-    if (score === null) continue;
-    if (best === null || score > best) best = score;
+    const outcome = scoreCardPlayOutcome(state, card, strategy, self);
+    if (outcome === null) continue;
+    if (
+      best === null ||
+      outcome.score > best.score ||
+      (outcome.score === best.score && outcome.wealth > best.wealth)
+    ) {
+      best = outcome;
+    }
   }
-  return best ?? strategyScore(state, self, strategy, { includeEntry: false });
+  if (best) return best;
+  return {
+    score: strategyScore(state, self, strategy, { includeEntry: false }),
+    wealth: netWorth(state, self),
+  };
 }
 
 function scoreThroughChoices(
@@ -366,18 +411,36 @@ function scoreThroughChoices(
   strategy: AiStrategy,
   self: number,
 ): number | null {
+  const outcome = scoreThroughChoicesOutcome(state, strategy, self);
+  return outcome?.score ?? null;
+}
+
+function scoreThroughChoicesOutcome(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): HandPlayBest | null {
   if (state.phase !== "chooseCompany") {
-    return strategyScore(state, self, strategy, { includeEntry: false });
+    return {
+      score: strategyScore(state, self, strategy, { includeEntry: false }),
+      wealth: netWorth(state, self),
+    };
   }
   const card = state.pendingCard;
   if (!card) return null;
-  let best: number | null = null;
+  let best: HandPlayBest | null = null;
   for (const company of allowedChoices(card)) {
     const chosen = reduce(state, { type: "chooseCompany", company });
     if (!chosen.ok) continue;
-    const score = scoreThroughChoices(chosen.state, strategy, self);
-    if (score === null) continue;
-    if (best === null || score > best) best = score;
+    const outcome = scoreThroughChoicesOutcome(chosen.state, strategy, self);
+    if (outcome === null) continue;
+    if (
+      best === null ||
+      outcome.score > best.score ||
+      (outcome.score === best.score && outcome.wealth > best.wealth)
+    ) {
+      best = outcome;
+    }
   }
   return best;
 }
@@ -388,9 +451,25 @@ function scoreCardPlay(
   strategy: AiStrategy,
   self: number,
 ): number | null {
-  const played = reduce(state, { type: "playCard", cardId: card.id });
+  return scoreCardPlayOutcome(state, card, strategy, self)?.score ?? null;
+}
+
+function scoreCardPlayOutcome(
+  state: GameState,
+  card: Card,
+  strategy: AiStrategy,
+  self: number,
+): HandPlayBest | null {
+  // chooseTurn scores Draw by simulating a hand play; reduce() only accepts
+  // playCard in chooseHandCard, so lift the phase for lookahead only.
+  let from = state;
+  if (state.phase === "chooseTurn") {
+    from = cloneForSim(state);
+    from.phase = "chooseHandCard";
+  }
+  const played = reduce(from, { type: "playCard", cardId: card.id });
   if (!played.ok) return null;
-  return scoreThroughChoices(played.state, strategy, self);
+  return scoreThroughChoicesOutcome(played.state, strategy, self);
 }
 
 function chooseTurnIntent(
@@ -399,22 +478,79 @@ function chooseTurnIntent(
   self: number,
 ): Intent {
   const candidates: Scored[] = [];
+  const handLen = state.players[self].hand.length;
+  const wealthNow = netWorth(state, self);
+  let drawScore: number | null = null;
+  let tradeScore: number | null = null;
+  let drawWealth: number | null = null;
+  let tradeWealth: number | null = null;
+  let wealthOverride: "draw" | null = null;
 
   if (state.drawPile.length > 0) {
-    const drawScore = bestHandPlayScore(state, strategy, self);
+    const play = bestHandPlay(state, strategy, self);
+    drawScore = play.score;
+    drawWealth = play.wealth;
     candidates.push({ intent: { type: "draw" }, score: drawScore });
   }
 
   const tradeStart = reduce(state, { type: "startTrade" });
   if (tradeStart.ok) {
-    const tradeScore = simulateTradePlanScore(tradeStart.state, strategy, self);
+    const afterTrade = simulateTradePlan(tradeStart.state, strategy, self);
+    tradeScore = strategyScore(afterTrade, self, strategy, { includeEntry: true });
+    tradeWealth = netWorth(afterTrade, self);
     candidates.push({ intent: { type: "startTrade" }, score: tradeScore });
   }
 
+  // Realization override: chance/option value on an unplayed hand can make
+  // Trade outscore Draw forever. If the best hand play raises net worth more
+  // than the trade plan, force Draw so pumps get realized.
+  if (
+    drawWealth !== null &&
+    tradeWealth !== null &&
+    drawWealth > tradeWealth &&
+    drawWealth > wealthNow
+  ) {
+    wealthOverride = "draw";
+  }
+
+  // #region agent log
+  dbg("H1", "ai.ts:chooseTurnIntent", "draw vs trade scores", {
+    strategy,
+    self,
+    handLen,
+    drawPileLen: state.drawPile.length,
+    cash: state.players[self].cash,
+    wealthNow,
+    drawScore,
+    tradeScore,
+    drawWealth,
+    tradeWealth,
+    wealthOverride,
+    prefersTrade:
+      wealthOverride !== "draw" &&
+      tradeScore !== null &&
+      (drawScore === null || tradeScore > drawScore),
+    prefersDraw:
+      wealthOverride === "draw" ||
+      (drawScore !== null &&
+        (tradeScore === null || drawScore > tradeScore)),
+  });
+  // #endregion
+
+  if (wealthOverride === "draw") {
+    return { type: "draw" };
+  }
+
   if (candidates.length === 0) {
+    // #region agent log
+    dbg("H1", "ai.ts:chooseTurnIntent", "no candidates — fallback startTrade", {
+      drawPileLen: state.drawPile.length,
+      handLen,
+    });
+    // #endregion
     return { type: "startTrade" };
   }
-  return pickBest(candidates);
+  return pickBest(candidates, "chooseTurnIntent");
 }
 
 function chooseHandCardIntent(
@@ -424,12 +560,26 @@ function chooseHandCardIntent(
 ): Intent {
   const hand = state.players[self].hand;
   const scored: Scored[] = [];
+  let nullScores = 0;
   for (const card of hand) {
     const score = scoreCardPlay(state, card, strategy, self);
-    if (score === null) continue;
+    if (score === null) {
+      nullScores += 1;
+      continue;
+    }
     scored.push({ intent: { type: "playCard", cardId: card.id }, score });
   }
-  return pickBest(scored);
+  // #region agent log
+  dbg("H3", "ai.ts:chooseHandCardIntent", "hand card scoring", {
+    strategy,
+    self,
+    handLen: hand.length,
+    scoredLen: scored.length,
+    nullScores,
+    handIds: hand.map((c) => c.id),
+  });
+  // #endregion
+  return pickBest(scored, "chooseHandCardIntent");
 }
 
 function chooseCompanyIntent(
@@ -440,14 +590,24 @@ function chooseCompanyIntent(
   const card = state.pendingCard;
   if (!card) throw new Error("AI expected a pending card");
   const scored: Scored[] = [];
-  for (const company of allowedChoices(card)) {
+  const choices = allowedChoices(card);
+  for (const company of choices) {
     const chosen = reduce(state, { type: "chooseCompany", company });
     if (!chosen.ok) continue;
     const score = scoreThroughChoices(chosen.state, strategy, self);
     if (score === null) continue;
     scored.push({ intent: { type: "chooseCompany", company }, score });
   }
-  return pickBest(scored);
+  // #region agent log
+  dbg("H5", "ai.ts:chooseCompanyIntent", "company choice scoring", {
+    strategy,
+    self,
+    pendingCardId: card.id,
+    choiceCount: choices.length,
+    scoredLen: scored.length,
+  });
+  // #endregion
+  return pickBest(scored, "chooseCompanyIntent");
 }
 
 function chooseTradeIntent(
@@ -483,18 +643,58 @@ export function chooseIntent(state: GameState): Intent {
   const strategy = player.strategy ?? "defensive";
   const self = state.currentPlayerIndex;
 
+  // #region agent log
+  // Skip noisy per-tick trade micro-steps; still log turn/hand/company decisions.
+  if (state.phase !== "optionalTrade") {
+    dbg("H0", "ai.ts:chooseIntent", "entry", {
+      phase: state.phase,
+      self,
+      strategy,
+      handLen: player.hand.length,
+      cash: player.cash,
+      drawPileLen: state.drawPile.length,
+    });
+  }
+  // #endregion
+
+  let intent: Intent;
   switch (state.phase) {
     case "chooseTurn":
-      return chooseTurnIntent(state, strategy, self);
+      intent = chooseTurnIntent(state, strategy, self);
+      break;
     case "chooseHandCard":
-      return chooseHandCardIntent(state, strategy, self);
+      intent = chooseHandCardIntent(state, strategy, self);
+      break;
     case "chooseCompany":
-      return chooseCompanyIntent(state, strategy, self);
+      intent = chooseCompanyIntent(state, strategy, self);
+      break;
     case "optionalTrade":
-      return chooseTradeIntent(state, strategy, self);
+      intent = chooseTradeIntent(state, strategy, self);
+      break;
     default: {
       const _never: never = state.phase;
       throw new Error(`No AI policy for phase ${_never}`);
     }
   }
+  // #region agent log
+  if (state.phase !== "optionalTrade" || intent.type === "endTrade") {
+    dbg("H1", "ai.ts:chooseIntent", "exit", {
+      phase: state.phase,
+      intentType: intent.type,
+      intent:
+        intent.type === "playCard"
+          ? { type: intent.type, cardId: intent.cardId }
+          : intent.type === "buy" || intent.type === "sell"
+            ? {
+                type: intent.type,
+                company: intent.company,
+                quantity: intent.quantity,
+              }
+            : intent.type === "chooseCompany"
+              ? { type: intent.type, company: intent.company }
+              : { type: intent.type },
+    });
+  }
+  // #endregion
+  return intent;
 }

@@ -684,9 +684,45 @@ function Board({
         timer = window.setTimeout(() => {
           if (cancelled) return;
           const result = reduce(stateRef.current, intent);
+          // #region agent log
+          if (!result.ok) {
+            console.error(
+              "[AI-DEBUG H6]",
+              JSON.stringify({
+                hypothesisId: "H6",
+                location: "App.tsx:AI-step-reduce",
+                message: "reduce failed after chooseIntent",
+                data: {
+                  intent,
+                  phase: stateRef.current.phase,
+                  lastError: result.state.lastError,
+                },
+                timestamp: Date.now(),
+              }),
+            );
+          }
+          // #endregion
           setState(result.state);
         }, delay);
-      } catch {
+      } catch (err) {
+        // #region agent log
+        console.error(
+          "[AI-DEBUG H2]",
+          JSON.stringify({
+            hypothesisId: "H2",
+            location: "App.tsx:AI-step-catch",
+            message: "chooseIntent threw — AI turn frozen",
+            data: {
+              error: err instanceof Error ? err.message : String(err),
+              phase: live.phase,
+              handLen: seat.hand.length,
+              drawPileLen: live.drawPile.length,
+              player: seat.name,
+            },
+            timestamp: Date.now(),
+          }),
+        );
+        // #endregion
         // Ignore transient AI errors; human can reset.
       }
     };

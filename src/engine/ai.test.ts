@@ -450,6 +450,96 @@ describe("AI strategies", () => {
     expect(chooseIntent(state)).toEqual({ type: "startTrade" });
   });
 
+  it("prefers Draw when already positioned in hand-pumped names and cash is low", () => {
+    const state = testState({
+      phase: "chooseTurn",
+      drawPile: [riseBmw],
+      prices: { commerzbank: 100, bayer: 100, bmw: 100, bp: 100 },
+      players: [
+        aiPlayer("Bot", "middle", {
+          // No spare cash to deploy; book already matches BMW pumps only.
+          cash: 50,
+          shares: { ...emptyShares(), bmw: 10 },
+          hand: [pumpBmw60, boostBmw],
+        }),
+        humanPlayer("Ada"),
+      ],
+    });
+    expect(chooseIntent(state)).toEqual({ type: "draw" });
+  });
+
+  it("after buying into a pump name, later turns draw and play a card", () => {
+    let state = testState({
+      phase: "chooseTurn",
+      drawPile: [riseBmw, boostBmw, pumpBmw60],
+      players: [
+        aiPlayer("Bot", "middle", {
+          cash: 1000,
+          shares: emptyShares(),
+          // Single-name pump hand so Trade deploys into BMW, then Draw realizes.
+          hand: [pumpBmw60, boostBmw, pumpBmw60, boostBmw].map((c, i) => ({
+            ...c,
+            id: `${c.id}-${i}`,
+          })),
+        }),
+        humanPlayer("Ada"),
+      ],
+    });
+
+    // Turn 1: deploy idle cash (Trade), then leave trade.
+    expect(chooseIntent(state)).toEqual({ type: "startTrade" });
+    state = reduce(state, { type: "startTrade" }).state;
+    let guard = 0;
+    while (state.phase === "optionalTrade" && guard < 20) {
+      const intent = chooseIntent(state);
+      const next = reduce(state, intent);
+      expect(next.ok).toBe(true);
+      state = next.state;
+      if (intent.type === "endTrade") break;
+      guard += 1;
+    }
+    expect(state.players[0].shares.bmw).toBeGreaterThan(0);
+    expect(state.phase).toBe("chooseTurn");
+
+    // Human passes.
+    state = {
+      ...state,
+      currentPlayerIndex: 1,
+      phase: "chooseTurn",
+    };
+    state = reduce(state, { type: "startTrade" }).state;
+    state = reduce(state, { type: "endTrade" }).state;
+    expect(state.currentPlayerIndex).toBe(0);
+    expect(state.phase).toBe("chooseTurn");
+
+    // Turn 2+: must leave Trade-only and eventually play a hand card.
+    let sawDraw = false;
+    let sawPlay = false;
+    guard = 0;
+    while (!sawPlay && state.phase !== "gameOver" && guard < 30) {
+      if (state.currentPlayerIndex !== 0) {
+        if (state.phase === "chooseTurn") {
+          state = reduce(state, { type: "startTrade" }).state;
+        } else if (state.phase === "optionalTrade") {
+          state = reduce(state, { type: "endTrade" }).state;
+        } else {
+          break;
+        }
+        guard += 1;
+        continue;
+      }
+      const intent = chooseIntent(state);
+      if (intent.type === "draw") sawDraw = true;
+      if (intent.type === "playCard") sawPlay = true;
+      const next = reduce(state, intent);
+      expect(next.ok).toBe(true);
+      state = next.state;
+      guard += 1;
+    }
+    expect(sawDraw).toBe(true);
+    expect(sawPlay).toBe(true);
+  });
+
   it("scores Aggressive hotter than Defensive on the same leveraged book", () => {
     const state = testState({
       prices: { commerzbank: 100, bayer: 100, bmw: 20, bp: 100 },
