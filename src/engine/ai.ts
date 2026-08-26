@@ -14,31 +14,6 @@ import {
 
 const TRADE_STEP_CAP = 12;
 
-// #region agent log
-type DebugGlobal = typeof globalThis & { __AI_DEBUG_LOGS__?: string[] };
-function dbg(
-  hypothesisId: string,
-  location: string,
-  message: string,
-  data: Record<string, unknown> = {},
-): void {
-  const line = `${JSON.stringify({ hypothesisId, location, message, data, timestamp: Date.now() })}\n`;
-  const g = globalThis as DebugGlobal;
-  if (!g.__AI_DEBUG_LOGS__) g.__AI_DEBUG_LOGS__ = [];
-  g.__AI_DEBUG_LOGS__.push(line);
-}
-/** Drain in-memory NDJSON lines (for vitest repro → /opt/cursor/logs/debug.log). */
-export function drainAiDebugLogs(): string {
-  const g = globalThis as DebugGlobal;
-  const lines = g.__AI_DEBUG_LOGS__ ?? [];
-  g.__AI_DEBUG_LOGS__ = [];
-  return lines.join("");
-}
-export function flushAiDebugLogs(): void {
-  /* kept for repro API compatibility; drainAiDebugLogs is the real sink */
-}
-// #endregion
-
 const INTENT_PREF: Record<Intent["type"], number> = {
   endTrade: 0,
   sell: 1,
@@ -285,13 +260,8 @@ function compareTieKeys(a: Intent, b: Intent): number {
 
 type Scored = { intent: Intent; score: number };
 
-function pickBest(candidates: Scored[], context?: string): Intent {
+function pickBest(candidates: Scored[]): Intent {
   if (candidates.length === 0) {
-    // #region agent log
-    dbg("H2", "ai.ts:pickBest", "empty candidates — will throw", {
-      context: context ?? "unknown",
-    });
-    // #endregion
     throw new Error("AI has no legal intents");
   }
   let best = candidates[0];
@@ -478,27 +448,24 @@ function chooseTurnIntent(
   self: number,
 ): Intent {
   const candidates: Scored[] = [];
-  const handLen = state.players[self].hand.length;
   const wealthNow = netWorth(state, self);
-  let drawScore: number | null = null;
-  let tradeScore: number | null = null;
   let drawWealth: number | null = null;
   let tradeWealth: number | null = null;
-  let wealthOverride: "draw" | null = null;
 
   if (state.drawPile.length > 0) {
     const play = bestHandPlay(state, strategy, self);
-    drawScore = play.score;
     drawWealth = play.wealth;
-    candidates.push({ intent: { type: "draw" }, score: drawScore });
+    candidates.push({ intent: { type: "draw" }, score: play.score });
   }
 
   const tradeStart = reduce(state, { type: "startTrade" });
   if (tradeStart.ok) {
     const afterTrade = simulateTradePlan(tradeStart.state, strategy, self);
-    tradeScore = strategyScore(afterTrade, self, strategy, { includeEntry: true });
     tradeWealth = netWorth(afterTrade, self);
-    candidates.push({ intent: { type: "startTrade" }, score: tradeScore });
+    candidates.push({
+      intent: { type: "startTrade" },
+      score: strategyScore(afterTrade, self, strategy, { includeEntry: true }),
+    });
   }
 
   // Realization override: chance/option value on an unplayed hand can make
@@ -510,47 +477,13 @@ function chooseTurnIntent(
     drawWealth > tradeWealth &&
     drawWealth > wealthNow
   ) {
-    wealthOverride = "draw";
-  }
-
-  // #region agent log
-  dbg("H1", "ai.ts:chooseTurnIntent", "draw vs trade scores", {
-    strategy,
-    self,
-    handLen,
-    drawPileLen: state.drawPile.length,
-    cash: state.players[self].cash,
-    wealthNow,
-    drawScore,
-    tradeScore,
-    drawWealth,
-    tradeWealth,
-    wealthOverride,
-    prefersTrade:
-      wealthOverride !== "draw" &&
-      tradeScore !== null &&
-      (drawScore === null || tradeScore > drawScore),
-    prefersDraw:
-      wealthOverride === "draw" ||
-      (drawScore !== null &&
-        (tradeScore === null || drawScore > tradeScore)),
-  });
-  // #endregion
-
-  if (wealthOverride === "draw") {
     return { type: "draw" };
   }
 
   if (candidates.length === 0) {
-    // #region agent log
-    dbg("H1", "ai.ts:chooseTurnIntent", "no candidates — fallback startTrade", {
-      drawPileLen: state.drawPile.length,
-      handLen,
-    });
-    // #endregion
     return { type: "startTrade" };
   }
-  return pickBest(candidates, "chooseTurnIntent");
+  return pickBest(candidates);
 }
 
 function chooseHandCardIntent(
@@ -560,26 +493,12 @@ function chooseHandCardIntent(
 ): Intent {
   const hand = state.players[self].hand;
   const scored: Scored[] = [];
-  let nullScores = 0;
   for (const card of hand) {
     const score = scoreCardPlay(state, card, strategy, self);
-    if (score === null) {
-      nullScores += 1;
-      continue;
-    }
+    if (score === null) continue;
     scored.push({ intent: { type: "playCard", cardId: card.id }, score });
   }
-  // #region agent log
-  dbg("H3", "ai.ts:chooseHandCardIntent", "hand card scoring", {
-    strategy,
-    self,
-    handLen: hand.length,
-    scoredLen: scored.length,
-    nullScores,
-    handIds: hand.map((c) => c.id),
-  });
-  // #endregion
-  return pickBest(scored, "chooseHandCardIntent");
+  return pickBest(scored);
 }
 
 function chooseCompanyIntent(
@@ -590,24 +509,14 @@ function chooseCompanyIntent(
   const card = state.pendingCard;
   if (!card) throw new Error("AI expected a pending card");
   const scored: Scored[] = [];
-  const choices = allowedChoices(card);
-  for (const company of choices) {
+  for (const company of allowedChoices(card)) {
     const chosen = reduce(state, { type: "chooseCompany", company });
     if (!chosen.ok) continue;
     const score = scoreThroughChoices(chosen.state, strategy, self);
     if (score === null) continue;
     scored.push({ intent: { type: "chooseCompany", company }, score });
   }
-  // #region agent log
-  dbg("H5", "ai.ts:chooseCompanyIntent", "company choice scoring", {
-    strategy,
-    self,
-    pendingCardId: card.id,
-    choiceCount: choices.length,
-    scoredLen: scored.length,
-  });
-  // #endregion
-  return pickBest(scored, "chooseCompanyIntent");
+  return pickBest(scored);
 }
 
 function chooseTradeIntent(
@@ -643,58 +552,18 @@ export function chooseIntent(state: GameState): Intent {
   const strategy = player.strategy ?? "defensive";
   const self = state.currentPlayerIndex;
 
-  // #region agent log
-  // Skip noisy per-tick trade micro-steps; still log turn/hand/company decisions.
-  if (state.phase !== "optionalTrade") {
-    dbg("H0", "ai.ts:chooseIntent", "entry", {
-      phase: state.phase,
-      self,
-      strategy,
-      handLen: player.hand.length,
-      cash: player.cash,
-      drawPileLen: state.drawPile.length,
-    });
-  }
-  // #endregion
-
-  let intent: Intent;
   switch (state.phase) {
     case "chooseTurn":
-      intent = chooseTurnIntent(state, strategy, self);
-      break;
+      return chooseTurnIntent(state, strategy, self);
     case "chooseHandCard":
-      intent = chooseHandCardIntent(state, strategy, self);
-      break;
+      return chooseHandCardIntent(state, strategy, self);
     case "chooseCompany":
-      intent = chooseCompanyIntent(state, strategy, self);
-      break;
+      return chooseCompanyIntent(state, strategy, self);
     case "optionalTrade":
-      intent = chooseTradeIntent(state, strategy, self);
-      break;
+      return chooseTradeIntent(state, strategy, self);
     default: {
       const _never: never = state.phase;
       throw new Error(`No AI policy for phase ${_never}`);
     }
   }
-  // #region agent log
-  if (state.phase !== "optionalTrade" || intent.type === "endTrade") {
-    dbg("H1", "ai.ts:chooseIntent", "exit", {
-      phase: state.phase,
-      intentType: intent.type,
-      intent:
-        intent.type === "playCard"
-          ? { type: intent.type, cardId: intent.cardId }
-          : intent.type === "buy" || intent.type === "sell"
-            ? {
-                type: intent.type,
-                company: intent.company,
-                quantity: intent.quantity,
-              }
-            : intent.type === "chooseCompany"
-              ? { type: intent.type, company: intent.company }
-              : { type: intent.type },
-    });
-  }
-  // #endregion
-  return intent;
 }
