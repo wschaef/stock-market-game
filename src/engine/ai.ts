@@ -148,7 +148,9 @@ export function chanceScore(
     // Scale holding synergy below full dollar Δ so it does not outweigh realized wealth
     // when choosing which card to play (remaining-hand option value).
     chance += 0.3 * s * u;
-    chance += Math.max(0, s - r) * u;
+    // Share-lead synergy is also scaled: at 1.0 * (s−r) * U, unrealized option
+    // value outweighs realizing the same Δ via playCard (Trade-only deferral).
+    chance += 0.3 * Math.max(0, s - r) * u;
     // Entry leverage is for trade decisions; omit when scoring card plays so
     // deferred pumps do not beat immediately better plays.
     if (includeEntry) {
@@ -325,11 +327,11 @@ function enumerateTradeIntents(state: GameState): Intent[] {
   return intents;
 }
 
-function simulateTradePlanScore(
+function simulateTradePlan(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number {
+): GameState {
   let cursor = state;
   for (let step = 0; step < TRADE_STEP_CAP; step++) {
     if (cursor.phase !== "optionalTrade") break;
@@ -343,22 +345,63 @@ function simulateTradePlanScore(
     const ended = reduce(cursor, { type: "endTrade" });
     if (ended.ok) cursor = ended.state;
   }
-  return strategyScore(cursor, self, strategy, { includeEntry: true });
+  return cursor;
 }
 
-function bestHandPlayScore(
+/** Undeployed cash + hand upside in names we barely hold → buy before empty card plays. */
+function idleCashDeployer(state: GameState, self: number): boolean {
+  const player = state.players[self];
+  const w = netWorth(state, self);
+  if (player.cash / Math.max(w, 1) < 0.35) return false;
+  for (const company of COMPANIES) {
+    const upside = handUpside(state, self, company);
+    if (upside <= 0) continue;
+    const book = player.shares[company] * state.prices[company];
+    if (book < w * 0.15) return true;
+  }
+  return false;
+}
+
+function tradePlanDeployed(
+  before: GameState,
+  after: GameState,
+  self: number,
+): boolean {
+  const prev = before.players[self];
+  const next = after.players[self];
+  if (prev.cash !== next.cash) return true;
+  for (const company of COMPANIES) {
+    if (prev.shares[company] !== next.shares[company]) return true;
+  }
+  return false;
+}
+
+/** Best post-play strategy score / wealth from the current hand (lookahead). */
+type HandPlayBest = { score: number; wealth: number };
+
+function bestHandPlay(
   state: GameState,
   strategy: AiStrategy,
   self: number,
-): number {
+): HandPlayBest {
   const hand = state.players[self].hand;
-  let best: number | null = null;
+  let best: HandPlayBest | null = null;
   for (const card of hand) {
-    const score = scoreCardPlay(state, card, strategy, self);
-    if (score === null) continue;
-    if (best === null || score > best) best = score;
+    const outcome = scoreCardPlayOutcome(state, card, strategy, self);
+    if (outcome === null) continue;
+    if (
+      best === null ||
+      outcome.score > best.score ||
+      (outcome.score === best.score && outcome.wealth > best.wealth)
+    ) {
+      best = outcome;
+    }
   }
-  return best ?? strategyScore(state, self, strategy, { includeEntry: false });
+  if (best) return best;
+  return {
+    score: strategyScore(state, self, strategy, { includeEntry: false }),
+    wealth: netWorth(state, self),
+  };
 }
 
 function scoreThroughChoices(
@@ -366,18 +409,36 @@ function scoreThroughChoices(
   strategy: AiStrategy,
   self: number,
 ): number | null {
+  const outcome = scoreThroughChoicesOutcome(state, strategy, self);
+  return outcome?.score ?? null;
+}
+
+function scoreThroughChoicesOutcome(
+  state: GameState,
+  strategy: AiStrategy,
+  self: number,
+): HandPlayBest | null {
   if (state.phase !== "chooseCompany") {
-    return strategyScore(state, self, strategy, { includeEntry: false });
+    return {
+      score: strategyScore(state, self, strategy, { includeEntry: false }),
+      wealth: netWorth(state, self),
+    };
   }
   const card = state.pendingCard;
   if (!card) return null;
-  let best: number | null = null;
+  let best: HandPlayBest | null = null;
   for (const company of allowedChoices(card)) {
     const chosen = reduce(state, { type: "chooseCompany", company });
     if (!chosen.ok) continue;
-    const score = scoreThroughChoices(chosen.state, strategy, self);
-    if (score === null) continue;
-    if (best === null || score > best) best = score;
+    const outcome = scoreThroughChoicesOutcome(chosen.state, strategy, self);
+    if (outcome === null) continue;
+    if (
+      best === null ||
+      outcome.score > best.score ||
+      (outcome.score === best.score && outcome.wealth > best.wealth)
+    ) {
+      best = outcome;
+    }
   }
   return best;
 }
@@ -388,9 +449,25 @@ function scoreCardPlay(
   strategy: AiStrategy,
   self: number,
 ): number | null {
-  const played = reduce(state, { type: "playCard", cardId: card.id });
+  return scoreCardPlayOutcome(state, card, strategy, self)?.score ?? null;
+}
+
+function scoreCardPlayOutcome(
+  state: GameState,
+  card: Card,
+  strategy: AiStrategy,
+  self: number,
+): HandPlayBest | null {
+  // chooseTurn scores Draw by simulating a hand play; reduce() only accepts
+  // playCard in chooseHandCard, so lift the phase for lookahead only.
+  let from = state;
+  if (state.phase === "chooseTurn") {
+    from = cloneForSim(state);
+    from.phase = "chooseHandCard";
+  }
+  const played = reduce(from, { type: "playCard", cardId: card.id });
   if (!played.ok) return null;
-  return scoreThroughChoices(played.state, strategy, self);
+  return scoreThroughChoicesOutcome(played.state, strategy, self);
 }
 
 function chooseTurnIntent(
@@ -398,17 +475,55 @@ function chooseTurnIntent(
   strategy: AiStrategy,
   self: number,
 ): Intent {
+  const wealthNow = netWorth(state, self);
   const candidates: Scored[] = [];
+  let drawPlay: HandPlayBest | null = null;
+  let tradeWealth = wealthNow;
+  let tradeScoreWithEntry = strategyScore(state, self, strategy, {
+    includeEntry: true,
+  });
 
   if (state.drawPile.length > 0) {
-    const drawScore = bestHandPlayScore(state, strategy, self);
-    candidates.push({ intent: { type: "draw" }, score: drawScore });
+    drawPlay = bestHandPlay(state, strategy, self);
+    candidates.push({ intent: { type: "draw" }, score: drawPlay.score });
   }
 
   const tradeStart = reduce(state, { type: "startTrade" });
+  let afterTrade: GameState | null = null;
   if (tradeStart.ok) {
-    const tradeScore = simulateTradePlanScore(tradeStart.state, strategy, self);
-    candidates.push({ intent: { type: "startTrade" }, score: tradeScore });
+    afterTrade = simulateTradePlan(tradeStart.state, strategy, self);
+    tradeWealth = netWorth(afterTrade, self);
+    tradeScoreWithEntry = strategyScore(afterTrade, self, strategy, {
+      includeEntry: true,
+    });
+    candidates.push({
+      intent: { type: "startTrade" },
+      score: strategyScore(afterTrade, self, strategy, { includeEntry: false }),
+    });
+  }
+
+  const drawWealth = drawPlay?.wealth ?? wealthNow;
+  const drawGain = drawWealth - wealthNow;
+  const tradeGain = tradeWealth - wealthNow;
+
+  // Realizing a hand play beats standing when it raises wealth at least as much as trading.
+  if (drawGain > 0 && drawGain >= tradeGain) {
+    return { type: "draw" };
+  }
+
+  // Deploy idle cash into hand-strong names when the trade plan actually buys/sells.
+  if (
+    afterTrade &&
+    idleCashDeployer(state, self) &&
+    tradePlanDeployed(state, afterTrade, self) &&
+    tradeScoreWithEntry > (drawPlay?.score ?? tradeScoreWithEntry)
+  ) {
+    return { type: "startTrade" };
+  }
+
+  // Trade sessions that do not increase net worth are empty loops — draw instead.
+  if (tradeGain <= 0 && state.drawPile.length > 0) {
+    return { type: "draw" };
   }
 
   if (candidates.length === 0) {
