@@ -348,6 +348,34 @@ function simulateTradePlan(
   return cursor;
 }
 
+/** Undeployed cash + hand upside in names we barely hold → buy before empty card plays. */
+function idleCashDeployer(state: GameState, self: number): boolean {
+  const player = state.players[self];
+  const w = netWorth(state, self);
+  if (player.cash / Math.max(w, 1) < 0.35) return false;
+  for (const company of COMPANIES) {
+    const upside = handUpside(state, self, company);
+    if (upside <= 0) continue;
+    const book = player.shares[company] * state.prices[company];
+    if (book < w * 0.15) return true;
+  }
+  return false;
+}
+
+function tradePlanDeployed(
+  before: GameState,
+  after: GameState,
+  self: number,
+): boolean {
+  const prev = before.players[self];
+  const next = after.players[self];
+  if (prev.cash !== next.cash) return true;
+  for (const company of COMPANIES) {
+    if (prev.shares[company] !== next.shares[company]) return true;
+  }
+  return false;
+}
+
 /** Best post-play strategy score / wealth from the current hand (lookahead). */
 type HandPlayBest = { score: number; wealth: number };
 
@@ -447,36 +475,54 @@ function chooseTurnIntent(
   strategy: AiStrategy,
   self: number,
 ): Intent {
-  const candidates: Scored[] = [];
   const wealthNow = netWorth(state, self);
-  let drawWealth: number | null = null;
-  let tradeWealth: number | null = null;
+  const candidates: Scored[] = [];
+  let drawPlay: HandPlayBest | null = null;
+  let tradeWealth = wealthNow;
+  let tradeScoreWithEntry = strategyScore(state, self, strategy, {
+    includeEntry: true,
+  });
 
   if (state.drawPile.length > 0) {
-    const play = bestHandPlay(state, strategy, self);
-    drawWealth = play.wealth;
-    candidates.push({ intent: { type: "draw" }, score: play.score });
+    drawPlay = bestHandPlay(state, strategy, self);
+    candidates.push({ intent: { type: "draw" }, score: drawPlay.score });
   }
 
   const tradeStart = reduce(state, { type: "startTrade" });
+  let afterTrade: GameState | null = null;
   if (tradeStart.ok) {
-    const afterTrade = simulateTradePlan(tradeStart.state, strategy, self);
+    afterTrade = simulateTradePlan(tradeStart.state, strategy, self);
     tradeWealth = netWorth(afterTrade, self);
+    tradeScoreWithEntry = strategyScore(afterTrade, self, strategy, {
+      includeEntry: true,
+    });
     candidates.push({
       intent: { type: "startTrade" },
-      score: strategyScore(afterTrade, self, strategy, { includeEntry: true }),
+      score: strategyScore(afterTrade, self, strategy, { includeEntry: false }),
     });
   }
 
-  // Realization override: chance/option value on an unplayed hand can make
-  // Trade outscore Draw forever. If the best hand play raises net worth more
-  // than the trade plan, force Draw so pumps get realized.
+  const drawWealth = drawPlay?.wealth ?? wealthNow;
+  const drawGain = drawWealth - wealthNow;
+  const tradeGain = tradeWealth - wealthNow;
+
+  // Realizing a hand play beats standing when it raises wealth at least as much as trading.
+  if (drawGain > 0 && drawGain >= tradeGain) {
+    return { type: "draw" };
+  }
+
+  // Deploy idle cash into hand-strong names when the trade plan actually buys/sells.
   if (
-    drawWealth !== null &&
-    tradeWealth !== null &&
-    drawWealth > tradeWealth &&
-    drawWealth > wealthNow
+    afterTrade &&
+    idleCashDeployer(state, self) &&
+    tradePlanDeployed(state, afterTrade, self) &&
+    tradeScoreWithEntry > (drawPlay?.score ?? tradeScoreWithEntry)
   ) {
+    return { type: "startTrade" };
+  }
+
+  // Trade sessions that do not increase net worth are empty loops — draw instead.
+  if (tradeGain <= 0 && state.drawPile.length > 0) {
     return { type: "draw" };
   }
 

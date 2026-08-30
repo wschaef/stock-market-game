@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ACTION_CARDS } from "./catalog";
 import {
   chanceScore,
   chooseIntent,
@@ -448,6 +449,33 @@ describe("AI strategies", () => {
       ],
     });
     expect(chooseIntent(state)).toEqual({ type: "startTrade" });
+  });
+
+  it("prefers Draw when trade would not deploy cash", () => {
+    const byId = (id: string) => {
+      const card = ACTION_CARDS.find((c) => c.id === id);
+      if (!card) throw new Error(`missing ${id}`);
+      return { ...card };
+    };
+    const state = testState({
+      phase: "chooseTurn",
+      drawPile: [riseBmw],
+      prices: { commerzbank: 100, bayer: 100, bmw: 100, bp: 100 },
+      players: [
+        aiPlayer("Bot", "defensive", {
+          cash: 1000,
+          shares: emptyShares(),
+          hand: [
+            byId("std-bayer-m50"),
+            byId("mul-bayer-half"),
+            byId("p100-bp-2"),
+            byId("std-bmw-m50"),
+          ],
+        }),
+        humanPlayer("Ada"),
+      ],
+    });
+    expect(chooseIntent(state)).toEqual({ type: "draw" });
   });
 
   it("prefers Draw when already positioned in hand-pumped names and cash is low", () => {
