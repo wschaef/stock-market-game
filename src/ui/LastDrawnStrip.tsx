@@ -1,4 +1,5 @@
-import type { Card, GameState } from "../engine/types";
+import type { Card, Company, GameEvent, GameState } from "../engine/types";
+import { COMPANY_LABEL } from "../engine/types";
 import { lastDrawnView } from "./handVisibility";
 import { CompanyMark } from "./CompanyMark";
 import { cardEffectRows } from "./cardEffectRows";
@@ -28,7 +29,7 @@ function DrawnEffectRows({ card }: { card: Card }) {
   const rows = cardEffectRows(card);
   if (card.kind === "risk") {
     return (
-      <ul className="risk-strip last-drawn-effects" aria-label="Risk effects">
+      <ul className="risk-strip play-feed-effects" aria-label="Risk effects">
         {rows.map((row, index) =>
           row.kind === "delta" && row.company ? (
             <li key={`${row.company}-${index}`}>
@@ -47,7 +48,7 @@ function DrawnEffectRows({ card }: { card: Card }) {
   }
 
   return (
-    <ul className="effect-rows last-drawn-effects" aria-label="Action effects">
+    <ul className="effect-rows play-feed-effects" aria-label="Action effects">
       {rows.map((row, index) => (
         <li key={index} className="effect-row">
           {row.company ? (
@@ -64,32 +65,98 @@ function DrawnEffectRows({ card }: { card: Card }) {
   );
 }
 
-export function LastDrawnStrip({ state }: { state: GameState }) {
-  const view = lastDrawnView(state);
-  if (!view.visible) return null;
-
-  if (view.hidden) {
+function EventRow({ event }: { event: GameEvent }) {
+  const company = event.company as Company;
+  if (event.type === "split") {
     return (
-      <section className="last-drawn-panel last-drawn-panel-hidden" aria-live="polite">
-        <span className="last-drawn-label">Last drawn</span>
-        <p className="last-drawn-hidden">{view.message}</p>
-      </section>
+      <li className="play-feed-event play-feed-event-split">
+        <CompanyMark company={company} size="sm" />
+        <div className="play-feed-event-body">
+          <strong className="play-feed-event-kind">Split</strong>
+          <span className="play-feed-event-detail">
+            {event.target} → {event.newPrice}
+            {event.doubledShares ? " · shares ×2" : ""}
+          </span>
+        </div>
+      </li>
     );
   }
-
-  const { card } = view;
+  if (event.type === "wipeout") {
+    return (
+      <li className="play-feed-event play-feed-event-wipeout">
+        <CompanyMark company={company} size="sm" />
+        <div className="play-feed-event-body">
+          <strong className="play-feed-event-kind">Wipeout</strong>
+          <span className="play-feed-event-detail">
+            target {event.target} · shares lost · reset $100
+          </span>
+        </div>
+      </li>
+    );
+  }
+  const up = event.to > event.from;
+  const down = event.to < event.from;
   return (
-    <section
-      className="last-drawn-panel"
-      aria-live="polite"
-      aria-label={`Last drawn: ${card.title}`}
-      title={card.text}
-    >
-      <span className="last-drawn-label">Last drawn</span>
-      <DrawnEffectRows card={card} />
-      <span className="card-kind last-drawn-kind">
-        {card.kind === "risk" ? card.title : card.kind}
-      </span>
+    <li className={`play-feed-event ${up ? "pos" : down ? "neg" : ""}`}>
+      <CompanyMark company={company} size="sm" />
+      <div className="play-feed-event-body">
+        <strong className="play-feed-event-kind">{COMPANY_LABEL[company]}</strong>
+        <span className="play-feed-event-detail play-feed-price-move">
+          ${event.from} → ${event.to}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+/** Card + price outcomes for the latest play, shown under Holdings. */
+export function PlayFeed({ state }: { state: GameState }) {
+  const view = lastDrawnView(state);
+  const events = state.lastEvents;
+  const hasCard = view.visible;
+  const hasEvents = events.length > 0;
+  if (!hasCard && !hasEvents) return null;
+
+  return (
+    <section className="play-feed-panel" aria-live="polite" aria-label="Play feed">
+      <div className="section-head">
+        <h2>Play feed</h2>
+      </div>
+
+      {hasCard ? (
+        view.hidden ? (
+          <div className="play-feed-card play-feed-card-hidden">
+            <span className="play-feed-label">Drawn</span>
+            <p className="play-feed-hidden">{view.message}</p>
+          </div>
+        ) : (
+          <div
+            className="play-feed-card"
+            title={view.card.text}
+            aria-label={`Drawn: ${view.card.title}`}
+          >
+            <span className="play-feed-label">Drawn</span>
+            <DrawnEffectRows card={view.card} />
+            {view.card.kind === "risk" ? (
+              <span className="card-kind play-feed-kind">{view.card.title}</span>
+            ) : null}
+          </div>
+        )
+      ) : null}
+
+      {hasEvents ? (
+        <div className="play-feed-results">
+          <span className="play-feed-label">Market</span>
+          <ul className="play-feed-events">
+            {events.map((event, index) => (
+              <EventRow
+                key={`${event.company}-${event.type}-${index}`}
+                event={event}
+              />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }
