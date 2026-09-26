@@ -333,25 +333,53 @@ h2 {
 
 .board-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.9fr);
-  grid-template-rows: auto auto;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.95fr);
   gap: 1rem;
   align-items: start;
 }
 
-.market-panel {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.last-drawn-panel {
-  grid-column: 1;
-  grid-row: 2;
-}
-
 .scoreboard-panel {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1 / -1;
+}
+
+.trade-strip-panel,
+.market-chart-details,
+.last-drawn-panel {
+  grid-column: 1;
+}
+
+.market-chart-details {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+
+.market-chart-details > summary {
+  display: none;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.75rem 1rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+}
+
+.market-chart-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.market-chart-details .market-panel {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .market-panel,
@@ -359,7 +387,8 @@ h2 {
 .hand-panel,
 .picker-panel,
 .game-over-panel,
-.last-drawn-panel {
+.last-drawn-panel,
+.trade-strip-panel {
   margin: 0;
   padding: 1rem 1.05rem 1.1rem;
   border: 1px solid var(--line);
@@ -429,6 +458,10 @@ h2 {
 .picker-panel,
 .game-over-panel,
 .turn-actions {
+  margin-top: 0;
+}
+
+.picker-panel {
   margin-top: 1rem;
 }
 
@@ -557,6 +590,185 @@ h2 {
   padding: 0;
   display: grid;
   gap: 0.7rem;
+}
+
+.holdings-scroll {
+  overflow-x: auto;
+  margin: 0 -0.15rem;
+  padding: 0 0.15rem;
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.holdings-table th,
+.holdings-table td {
+  padding: 0.45rem 0.35rem;
+  text-align: center;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+
+.holdings-table thead th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.holdings-table thead th:first-child,
+.holdings-table tbody th,
+.holdings-table tfoot th {
+  text-align: left;
+}
+
+.holdings-table tbody th {
+  font-weight: 400;
+}
+
+.holdings-col-head {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+}
+
+.holdings-price {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.holdings-meta-row th,
+.holdings-meta-row td {
+  background: rgba(255, 255, 255, 0.03);
+  font-weight: 550;
+}
+
+.holdings-player-row th,
+.holdings-player-row td {
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.holdings-table tbody tr.holdings-player-row.on-turn {
+  background: linear-gradient(
+    135deg,
+    rgba(212, 160, 23, 0.16),
+    rgba(0, 0, 0, 0.12)
+  );
+}
+
+.holdings-table tbody tr.holdings-player-row.on-turn th,
+.holdings-table tbody tr.holdings-player-row.on-turn td {
+  border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.holdings-table .score-identity {
+  flex-wrap: wrap;
+  margin-bottom: 0.15rem;
+}
+
+.holdings-table .score-cash {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.holdings-table .score-wealth {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  font-size: 0.95rem;
+}
+
+.holdings-table td.dim {
+  opacity: 0.4;
+}
+
+.holdings-count {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.holdings-market-row th,
+.holdings-market-row td {
+  border-bottom: 0;
+  padding-top: 0.7rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 550;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.holdings-market {
+  display: grid;
+  gap: 0.15rem;
+  justify-items: center;
+}
+
+.holdings-market-shares {
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.holdings-market-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--warn);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.trade-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.trade-strip > li {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  padding: 0.55rem 0.35rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid transparent;
+}
+
+.trade-strip .share-trade {
+  justify-content: center;
+  width: 100%;
+}
+
+.trade-strip .share-trade button {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
 }
 
 .score-row {
@@ -746,8 +958,8 @@ h2 {
 
 .hand {
   display: grid;
-  gap: 0.85rem;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
 }
 
 .card {
@@ -756,17 +968,17 @@ h2 {
   background: linear-gradient(165deg, #fffdf8 0%, #efe6d4 100%);
   color: var(--ink-deep);
   border: 1px solid rgba(16, 32, 24, 0.18);
-  border-radius: 14px;
-  padding: 0.95rem 0.85rem 1.05rem;
+  border-radius: 10px;
+  padding: 0.55rem 0.55rem 0.6rem;
   width: 100%;
-  aspect-ratio: 5 / 7;
-  max-height: 240px;
+  min-height: 0;
+  max-height: none;
   display: grid;
-  align-content: space-between;
-  gap: 0.55rem;
+  align-content: start;
+  gap: 0.35rem;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    0 12px 24px rgba(0, 0, 0, 0.28);
+    0 8px 16px rgba(0, 0, 0, 0.24);
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
@@ -777,6 +989,7 @@ h2 {
 .card-back {
   align-content: center;
   justify-items: center;
+  min-height: 5.5rem;
   background:
     repeating-linear-gradient(
       135deg,
@@ -790,12 +1003,12 @@ h2 {
 .card-back-mark {
   display: grid;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 50%;
   border: 2px solid rgba(255, 248, 232, 0.4);
   font-family: Syne, Figtree, sans-serif;
-  font-size: 1.65rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.04em;
 }
@@ -805,16 +1018,16 @@ h2 {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.25rem;
 }
 
 .effect-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   font-family: Syne, Figtree, sans-serif;
   font-weight: 750;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
 }
 
 .effect-mag {
@@ -837,12 +1050,12 @@ h2 {
 .choice-token {
   display: inline-grid;
   place-items: center;
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
   background: var(--ink-deep);
   color: #fff;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
@@ -852,16 +1065,16 @@ h2 {
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.45rem 0.35rem;
+  gap: 0.25rem 0.3rem;
 }
 
 .risk-strip li {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
 }
 
 .risk-delta.pos {
@@ -874,12 +1087,16 @@ h2 {
 .card-kind {
   justify-self: start;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  font-size: 0.58rem;
   color: #5a6b5f;
   border: 1px solid rgba(16, 32, 24, 0.14);
   border-radius: 999px;
-  padding: 0.2rem 0.45rem;
+  padding: 0.12rem 0.35rem;
+}
+
+.card .company-mark.size-sm {
+  --mark-size: 1.2rem;
 }
 
 .hand-playable .card {
@@ -889,10 +1106,10 @@ h2 {
 .hand-playable .card:hover,
 .hand-playable .card:focus-visible,
 .card-previewing {
-  transform: translateY(-8px) rotate(-1.2deg);
+  transform: translateY(-4px) rotate(-0.8deg);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 18px 32px rgba(0, 0, 0, 0.35);
+    0 12px 22px rgba(0, 0, 0, 0.32);
   outline: none;
 }
 
@@ -902,8 +1119,56 @@ h2 {
 
 .turn-actions {
   justify-content: center;
-  padding: 0.35rem 0;
+  padding: 0;
   gap: 0.75rem;
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.play-dock {
+  margin-top: 1rem;
+}
+
+.play-dock-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.play-dock-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  flex: 1 1 auto;
+}
+
+.hand-toggle {
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.hand-toggle:disabled {
+  opacity: 0.7;
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  color: var(--accent);
+}
+
+.hand-flyout {
+  margin-top: 0.85rem;
+}
+
+.hand-flyout .hand-panel {
+  box-shadow: none;
+}
+
+.hand-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .turn-btn {
@@ -1054,16 +1319,49 @@ h2 {
 }
 
 @media (max-width: 860px) {
+  .board-shell {
+    padding-bottom: 6.5rem;
+  }
+
+  .board-shell.hand-sheet-open {
+    padding-bottom: min(58vh, 28rem);
+  }
+
   .board-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
   }
 
-  .market-panel,
-  .last-drawn-panel,
   .scoreboard-panel {
     grid-column: 1;
     grid-row: auto;
+    order: 1;
+  }
+
+  .trade-strip-panel {
+    grid-column: 1;
+    grid-row: auto;
+    order: 2;
+  }
+
+  .market-chart-details {
+    grid-column: 1;
+    grid-row: auto;
+    order: 3;
+  }
+
+  .market-chart-details > summary {
+    display: block;
+  }
+
+  .market-chart-details:not([open]) .market-panel {
+    display: none;
+  }
+
+  .last-drawn-panel {
+    grid-column: 1;
+    grid-row: auto;
+    order: 4;
   }
 
   .last-drawn-panel .risk-strip {
@@ -1077,11 +1375,94 @@ h2 {
   .turn-name {
     grid-column: 1 / -1;
   }
+
+  .trade-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .play-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    margin: 0;
+    padding: 0.65rem 0.85rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--felt-2) 92%, #000);
+    box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  .hand-flyout {
+    display: none;
+    margin-top: 0.65rem;
+    max-height: min(40vh, 16rem);
+    overflow: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .hand-flyout.is-open {
+    display: block;
+  }
+
+  .hand-flyout .hand-panel {
+    padding: 0.65rem 0.15rem 0.25rem;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .hand-flyout .section-head {
+    margin-bottom: 0.55rem;
+  }
+
+  .hand-flyout .hand-hint {
+    display: none;
+  }
+}
+
+@media (min-width: 861px) {
+  .hand-toggle {
+    display: none;
+  }
+
+  .play-dock-status {
+    display: none;
+  }
+
+  .hand-flyout {
+    display: block !important;
+  }
+
+  .market-chart-details {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .market-chart-details > .market-panel,
+  .market-chart-details .market-panel {
+    display: block !important;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow);
+  }
 }
 
 @media (max-width: 560px) {
   .hand {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 0.4rem;
+  }
+
+  .holdings-table .ai-pill {
+    display: none;
+  }
+
+  .holdings-table .score-wealth {
+    font-size: 0.85rem;
   }
 }
 
