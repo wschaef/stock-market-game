@@ -31,7 +31,7 @@ import {
   handPresentation,
   type HandPresentation,
 } from "./ui/handVisibility";
-import { LastDrawnStrip } from "./ui/LastDrawnStrip";
+import { PlayFeed } from "./ui/LastDrawnStrip";
 import {
   previewCardWealth,
   type CardWealthPreview,
@@ -66,19 +66,6 @@ function formatDelta(min: number, max: number): string {
   };
   if (min === max) return fmt(min);
   return `${fmt(min)}…${fmt(max)}`;
-}
-
-function eventText(state: GameState): string[] {
-  return state.lastEvents.map((event) => {
-    const name = COMPANY_LABEL[event.company];
-    if (event.type === "split") {
-      return `${name} split: target ${event.target} → ${event.newPrice}; shares doubled.`;
-    }
-    if (event.type === "wipeout") {
-      return `${name} wipeout (target ${event.target}): shares lost, price reset to 100.`;
-    }
-    return `${name}: ${event.from} → ${event.to}`;
-  });
 }
 
 function EffectMagnitude({
@@ -811,16 +798,12 @@ function Board({
       ) : null}
 
       {state.lastError ? <p className="error">{state.lastError}</p> : null}
-      {eventText(state).map((line) => (
-        <p className="event" key={line}>
-          {line}
-        </p>
-      ))}
 
       <div className="board-grid">
         {state.phase !== "gameOver" ? (
           <Scoreboard state={state} preview={preview} />
         ) : null}
+        {state.phase !== "gameOver" ? <PlayFeed state={state} /> : null}
         {state.phase !== "gameOver" && trading ? (
           <TradeStrip
             qty={qty}
@@ -836,7 +819,6 @@ function Board({
             <MarketDiagram state={state} />
           </details>
         ) : null}
-        <LastDrawnStrip state={state} />
       </div>
 
       {state.phase === "chooseCompany" && state.pendingCard && humanTurn ? (
