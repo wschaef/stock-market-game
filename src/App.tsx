@@ -391,6 +391,12 @@ function Scoreboard({
   const previewById = new Map(
     preview?.players.map((row) => [row.playerId, row]) ?? [],
   );
+  const shareTotals = Object.fromEntries(
+    COMPANIES.map((company) => [
+      company,
+      state.players.reduce((sum, player) => sum + player.shares[company], 0),
+    ]),
+  ) as Record<Company, number>;
 
   return (
     <section className="scoreboard-panel" aria-label="Holdings">
@@ -403,11 +409,19 @@ function Scoreboard({
       <div className="holdings-scroll">
         <table className="holdings-table">
           <thead>
-            <tr>
+            <tr className="holdings-meta-row holdings-price-row">
               <th scope="col">Player</th>
               {COMPANIES.map((company) => (
                 <th scope="col" key={company}>
-                  <CompanyMark company={company} size="sm" />
+                  <span className="holdings-col-head">
+                    <CompanyMark company={company} size="sm" />
+                    <FlashOnChange
+                      value={state.prices[company]}
+                      className="holdings-price"
+                    >
+                      {formatMoney(state.prices[company])}
+                    </FlashOnChange>
+                  </span>
                   <span className="sr-only">{COMPANY_LABEL[company]}</span>
                 </th>
               ))}
@@ -422,7 +436,7 @@ function Scoreboard({
               return (
                 <tr
                   key={player.id}
-                  className={onTurn ? "on-turn" : undefined}
+                  className={`holdings-player-row ${onTurn ? "on-turn" : ""}`}
                 >
                   <th scope="row">
                     <span className="score-identity">
@@ -476,79 +490,95 @@ function Scoreboard({
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="holdings-meta-row holdings-market-row">
+              <th scope="row">In shares</th>
+              {COMPANIES.map((company) => {
+                const total = shareTotals[company];
+                const market = total * state.prices[company];
+                return (
+                  <td key={company} className={total === 0 ? "dim" : undefined}>
+                    <span className="holdings-market">
+                      <span className="holdings-market-shares">{total}</span>
+                      <span className="holdings-market-value">
+                        {formatMoney(market)}
+                      </span>
+                    </span>
+                  </td>
+                );
+              })}
+              <td>
+                <span className="holdings-market-value">
+                  {formatMoney(
+                    COMPANIES.reduce(
+                      (sum, company) =>
+                        sum + shareTotals[company] * state.prices[company],
+                      0,
+                    ),
+                  )}
+                </span>
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </section>
   );
 }
 
-function PriceStrip({
-  state,
-  trading,
-  onBuy,
-  onSell,
+function TradeStrip({
   qty,
   setQty,
+  onBuy,
+  onSell,
   onEndTrade,
 }: {
-  state: GameState
-  trading: boolean
-  onBuy: (company: Company) => void
-  onSell: (company: Company) => void
   qty: number
   setQty: (n: number) => void
+  onBuy: (company: Company) => void
+  onSell: (company: Company) => void
   onEndTrade: () => void
 }) {
   return (
-    <section className="price-strip-panel" aria-label="Prices">
+    <section className="trade-strip-panel" aria-label="Trade">
       <div className="section-head">
-        <h2>Prices</h2>
+        <h2>Trade</h2>
       </div>
-      <ul className="price-strip">
+      <ul className="trade-strip">
         {COMPANIES.map((company) => (
           <li key={company} className={COMPANY_TONE[company]}>
             <CompanyMark company={company} size="sm" />
-            <FlashOnChange
-              value={state.prices[company]}
-              className="price-value"
-            >
-              {formatMoney(state.prices[company])}
-            </FlashOnChange>
-            {trading ? (
-              <div className="share-trade">
-                <button type="button" onClick={() => onBuy(company)}>
-                  Buy
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => onSell(company)}
-                >
-                  Sell
-                </button>
-              </div>
-            ) : null}
+            <div className="share-trade">
+              <button type="button" onClick={() => onBuy(company)}>
+                Buy
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => onSell(company)}
+              >
+                Sell
+              </button>
+            </div>
           </li>
         ))}
       </ul>
-      {trading ? (
-        <div className="trade-toolbar">
-          <label className="field inline">
-            Quantity
-            <input
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) =>
-                setQty(Math.max(1, Number(e.target.value) || 1))
-              }
-            />
-          </label>
-          <button type="button" className="cta" onClick={onEndTrade}>
-            End turn
-          </button>
-        </div>
-      ) : null}
+      <div className="trade-toolbar">
+        <label className="field inline">
+          Quantity
+          <input
+            type="number"
+            min={1}
+            value={qty}
+            onChange={(e) =>
+              setQty(Math.max(1, Number(e.target.value) || 1))
+            }
+          />
+        </label>
+        <button type="button" className="cta" onClick={onEndTrade}>
+          End turn
+        </button>
+      </div>
     </section>
   );
 }
@@ -798,10 +828,8 @@ function Board({
         {state.phase !== "gameOver" ? (
           <Scoreboard state={state} preview={preview} />
         ) : null}
-        {state.phase !== "gameOver" ? (
-          <PriceStrip
-            state={state}
-            trading={trading}
+        {state.phase !== "gameOver" && trading ? (
+          <TradeStrip
             qty={qty}
             setQty={setQty}
             onBuy={(company) => act({ type: "buy", company, quantity: qty })}
