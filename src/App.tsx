@@ -26,6 +26,7 @@ import { AI_PACE, aiDelayMs } from "./ui/aiPacing";
 import { cardEffectRows } from "./ui/cardEffectRows";
 import { CompanyMark } from "./ui/CompanyMark";
 import { FlashOnChange } from "./ui/FlashOnChange";
+import { handFlyoutForcedOpen } from "./ui/handFlyout";
 import {
   handPresentation,
   type HandPresentation,
@@ -392,103 +393,171 @@ function Scoreboard({
   );
 
   return (
-    <section className="scoreboard-panel" aria-label="Scoreboard">
+    <section className="scoreboard-panel" aria-label="Holdings">
       <div className="section-head">
-        <h2>Players</h2>
+        <h2>Holdings</h2>
         {preview?.dependsOnChoice ? (
           <p className="preview-note">Wealth range depends on [?]</p>
         ) : null}
       </div>
-      <ul className="scoreboard">
-        {state.players.map((player, index) => {
-          const wealth = netWorth(state, index);
-          const onTurn = index === state.currentPlayerIndex;
-          const delta = previewById.get(player.id);
-          return (
-            <li
-              key={player.id}
-              className={`score-row ${onTurn ? "on-turn" : ""}`}
-            >
-              <div className="score-identity">
-                {onTurn ? <span className="on-turn-pill">On turn</span> : null}
-                <strong className="score-name">{player.name}</strong>
-                {player.controller === "ai" ? (
-                  <span className="ai-pill">
-                    AI · {AI_STRATEGY_LABEL[player.strategy ?? "defensive"]}
-                  </span>
-                ) : null}
-              </div>
-              <div className="score-money">
-                <FlashOnChange value={player.cash} className="score-cash">
-                  Cash {formatMoney(player.cash)}
-                </FlashOnChange>
-                <FlashOnChange value={wealth} className="score-wealth">
-                  {formatMoney(wealth)}
-                  {delta ? (
-                    <span
-                      className={`wealth-delta ${
-                        delta.deltaMax < 0
-                          ? "neg"
-                          : delta.deltaMin > 0
-                            ? "pos"
-                            : "mixed"
-                      }`}
-                    >
-                      {formatDelta(delta.deltaMin, delta.deltaMax)}
+      <div className="holdings-scroll">
+        <table className="holdings-table">
+          <thead>
+            <tr>
+              <th scope="col">Player</th>
+              {COMPANIES.map((company) => (
+                <th scope="col" key={company}>
+                  <CompanyMark company={company} size="sm" />
+                  <span className="sr-only">{COMPANY_LABEL[company]}</span>
+                </th>
+              ))}
+              <th scope="col">Wealth</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.players.map((player, index) => {
+              const wealth = netWorth(state, index);
+              const onTurn = index === state.currentPlayerIndex;
+              const delta = previewById.get(player.id);
+              return (
+                <tr
+                  key={player.id}
+                  className={onTurn ? "on-turn" : undefined}
+                >
+                  <th scope="row">
+                    <span className="score-identity">
+                      {onTurn ? (
+                        <span className="on-turn-pill">On turn</span>
+                      ) : null}
+                      <strong className="score-name">{player.name}</strong>
+                      {player.controller === "ai" ? (
+                        <span className="ai-pill">
+                          AI ·{" "}
+                          {AI_STRATEGY_LABEL[player.strategy ?? "defensive"]}
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </FlashOnChange>
-              </div>
-              <ul className="score-shares">
-                {COMPANIES.map((company) => {
-                  const count = player.shares[company];
-                  return (
-                    <li
-                      key={company}
-                      className={count === 0 ? "dim" : undefined}
-                    >
-                      <CompanyMark company={company} size="sm" />
-                      <FlashOnChange value={count}>
-                        <span>{count}</span>
-                      </FlashOnChange>
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          );
-        })}
-      </ul>
+                    <FlashOnChange value={player.cash} className="score-cash">
+                      Cash {formatMoney(player.cash)}
+                    </FlashOnChange>
+                  </th>
+                  {COMPANIES.map((company) => {
+                    const count = player.shares[company];
+                    return (
+                      <td
+                        key={company}
+                        className={count === 0 ? "dim" : undefined}
+                      >
+                        <FlashOnChange value={count}>
+                          <span className="holdings-count">{count}</span>
+                        </FlashOnChange>
+                      </td>
+                    );
+                  })}
+                  <td>
+                    <FlashOnChange value={wealth} className="score-wealth">
+                      {formatMoney(wealth)}
+                      {delta ? (
+                        <span
+                          className={`wealth-delta ${
+                            delta.deltaMax < 0
+                              ? "neg"
+                              : delta.deltaMin > 0
+                                ? "pos"
+                                : "mixed"
+                          }`}
+                        >
+                          {formatDelta(delta.deltaMin, delta.deltaMax)}
+                        </span>
+                      ) : null}
+                    </FlashOnChange>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
 
-function MarketDiagram({
+function PriceStrip({
   state,
-  qty,
-  setQty,
-  humanControls,
+  trading,
   onBuy,
   onSell,
+  qty,
+  setQty,
   onEndTrade,
 }: {
   state: GameState
-  qty: number
-  setQty: (n: number) => void
-  humanControls: boolean
+  trading: boolean
   onBuy: (company: Company) => void
   onSell: (company: Company) => void
+  qty: number
+  setQty: (n: number) => void
   onEndTrade: () => void
 }) {
+  return (
+    <section className="price-strip-panel" aria-label="Prices">
+      <div className="section-head">
+        <h2>Prices</h2>
+      </div>
+      <ul className="price-strip">
+        {COMPANIES.map((company) => (
+          <li key={company} className={COMPANY_TONE[company]}>
+            <CompanyMark company={company} size="sm" />
+            <FlashOnChange
+              value={state.prices[company]}
+              className="price-value"
+            >
+              {formatMoney(state.prices[company])}
+            </FlashOnChange>
+            {trading ? (
+              <div className="share-trade">
+                <button type="button" onClick={() => onBuy(company)}>
+                  Buy
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => onSell(company)}
+                >
+                  Sell
+                </button>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {trading ? (
+        <div className="trade-toolbar">
+          <label className="field inline">
+            Quantity
+            <input
+              type="number"
+              min={1}
+              value={qty}
+              onChange={(e) =>
+                setQty(Math.max(1, Number(e.target.value) || 1))
+              }
+            />
+          </label>
+          <button type="button" className="cta" onClick={onEndTrade}>
+            End turn
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function MarketDiagram({ state }: { state: GameState }) {
   const ticks = priceBoardTicks();
-  const trading = canTrade(state) && humanControls;
 
   return (
-    <section className="market-panel" aria-label="Share prices">
-      <div className="section-head">
-        <h2>Share prices</h2>
-      </div>
-
+    <section className="market-panel" aria-label="Price chart">
       <ul className="price-diagram">
         {COMPANIES.map((company) => {
           const filled = priceBoardFilledCount(state.prices[company]);
@@ -530,43 +599,10 @@ function MarketDiagram({
                   );
                 })}
               </div>
-              {trading ? (
-                <div className="share-trade">
-                  <button type="button" onClick={() => onBuy(company)}>
-                    Buy
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => onSell(company)}
-                  >
-                    Sell
-                  </button>
-                </div>
-              ) : null}
             </li>
           );
         })}
       </ul>
-
-      {trading ? (
-        <div className="trade-toolbar">
-          <label className="field inline">
-            Quantity
-            <input
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) =>
-                setQty(Math.max(1, Number(e.target.value) || 1))
-              }
-            />
-          </label>
-          <button type="button" className="cta" onClick={onEndTrade}>
-            End turn
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -590,7 +626,7 @@ function Hand({
       >
         <div className="section-head">
           <h2>{presentation.label}</h2>
-          <p>Hidden from other players.</p>
+          <p className="hand-hint">Hidden from other players.</p>
         </div>
         <div className="hand hand-hidden">
           {Array.from({ length: presentation.count }, (_, index) => (
@@ -606,9 +642,11 @@ function Hand({
       <div className="section-head">
         <h2>{presentation.label}</h2>
         {presentation.playable ? (
-          <p>Hover a card to preview wealth changes. Click to play.</p>
+          <p className="hand-hint">
+            Preview wealth on the holdings table, then tap a card to play.
+          </p>
         ) : (
-          <p>Only you can see these cards.</p>
+          <p className="hand-hint">Only you can see these cards.</p>
         )}
       </div>
       <div
@@ -653,6 +691,7 @@ function Board({
 }) {
   const [qty, setQty] = useState(1);
   const [previewCardId, setPreviewCardId] = useState<string | null>(null);
+  const [handOpen, setHandOpen] = useState(false);
   const player = state.players[state.currentPlayerIndex];
   const humanTurn = player.controller === "human" && state.phase !== "gameOver";
   const stateRef = useRef(state);
@@ -706,9 +745,21 @@ function Board({
       : null;
   const preview = previewCard ? previewCardWealth(state, previewCard) : null;
   const cards = handPresentation(state);
+  const trading = canTrade(state) && humanTurn;
+  const forcedHandOpen = handFlyoutForcedOpen({
+    phase: state.phase,
+    humanTurn,
+  });
+  const sheetOpen = forcedHandOpen || handOpen;
+  const handCount =
+    cards.mode === "faceUp" ? cards.cards.length : cards.count;
+
+  useEffect(() => {
+    if (forcedHandOpen) setHandOpen(true);
+  }, [forcedHandOpen]);
 
   return (
-    <div className="shell board-shell">
+    <div className={`shell board-shell ${sheetOpen ? "hand-sheet-open" : ""}`}>
       <header className="top-bar">
         <p className="brand">Börsenspiel</p>
         <div className="top-meta">
@@ -744,76 +795,28 @@ function Board({
       ))}
 
       <div className="board-grid">
-        <MarketDiagram
-          state={state}
-          qty={qty}
-          setQty={setQty}
-          humanControls={humanTurn}
-          onBuy={(company) => act({ type: "buy", company, quantity: qty })}
-          onSell={(company) => act({ type: "sell", company, quantity: qty })}
-          onEndTrade={() => act({ type: "endTrade" })}
-        />
-        <LastDrawnStrip state={state} />
         {state.phase !== "gameOver" ? (
           <Scoreboard state={state} preview={preview} />
         ) : null}
+        {state.phase !== "gameOver" ? (
+          <PriceStrip
+            state={state}
+            trading={trading}
+            qty={qty}
+            setQty={setQty}
+            onBuy={(company) => act({ type: "buy", company, quantity: qty })}
+            onSell={(company) => act({ type: "sell", company, quantity: qty })}
+            onEndTrade={() => act({ type: "endTrade" })}
+          />
+        ) : null}
+        {state.phase !== "gameOver" ? (
+          <details className="market-chart-details">
+            <summary>Price chart</summary>
+            <MarketDiagram state={state} />
+          </details>
+        ) : null}
+        <LastDrawnStrip state={state} />
       </div>
-
-      {state.phase === "chooseTurn" && humanTurn ? (
-        <div className="action-row turn-actions">
-          <button
-            type="button"
-            className="turn-btn turn-btn-play"
-            disabled={state.drawPile.length === 0}
-            onClick={() => act({ type: "draw" })}
-          >
-            <span className="turn-btn-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-                <rect
-                  x="5"
-                  y="3"
-                  width="11"
-                  height="15"
-                  rx="2"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  transform="rotate(-8 10.5 10.5)"
-                />
-                <rect
-                  x="8"
-                  y="5"
-                  width="11"
-                  height="15"
-                  rx="2"
-                  fill="currentColor"
-                  fillOpacity="0.2"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                />
-              </svg>
-            </span>
-            Play Card
-          </button>
-          <button
-            type="button"
-            className="turn-btn turn-btn-trade"
-            onClick={() => act({ type: "startTrade" })}
-          >
-            <span className="turn-btn-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-                <path
-                  d="M7 8h11l-2.5-2.5M17 16H6l2.5 2.5"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            Trade only
-          </button>
-        </div>
-      ) : null}
 
       {state.phase === "chooseCompany" && state.pendingCard && humanTurn ? (
         <section className="picker-panel">
@@ -838,12 +841,95 @@ function Board({
       ) : null}
 
       {state.phase !== "gameOver" ? (
-        <Hand
-          presentation={cards}
-          previewCardId={previewCardId}
-          onPlay={(cardId) => act({ type: "playCard", cardId })}
-          onPreview={setPreviewCardId}
-        />
+        <div className={`play-dock ${sheetOpen ? "is-open" : ""}`}>
+          <div className="play-dock-bar">
+            {state.phase === "chooseTurn" && humanTurn ? (
+              <div className="action-row turn-actions">
+                <button
+                  type="button"
+                  className="turn-btn turn-btn-play"
+                  disabled={state.drawPile.length === 0}
+                  onClick={() => act({ type: "draw" })}
+                >
+                  <span className="turn-btn-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                      <rect
+                        x="5"
+                        y="3"
+                        width="11"
+                        height="15"
+                        rx="2"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        transform="rotate(-8 10.5 10.5)"
+                      />
+                      <rect
+                        x="8"
+                        y="5"
+                        width="11"
+                        height="15"
+                        rx="2"
+                        fill="currentColor"
+                        fillOpacity="0.2"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
+                  </span>
+                  Play Card
+                </button>
+                <button
+                  type="button"
+                  className="turn-btn turn-btn-trade"
+                  onClick={() => act({ type: "startTrade" })}
+                >
+                  <span className="turn-btn-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                      <path
+                        d="M7 8h11l-2.5-2.5M17 16H6l2.5 2.5"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  Trade only
+                </button>
+              </div>
+            ) : (
+              <p className="play-dock-status">
+                {forcedHandOpen
+                  ? "Play a card from your hand."
+                  : trading
+                    ? "Buy or sell, then end turn."
+                    : "Hand"}
+              </p>
+            )}
+            <button
+              type="button"
+              className="hand-toggle"
+              aria-expanded={sheetOpen}
+              aria-controls="hand-flyout"
+              disabled={forcedHandOpen}
+              onClick={() => setHandOpen((open) => !open)}
+            >
+              {sheetOpen && !forcedHandOpen ? "Hide cards" : `Hand (${handCount})`}
+            </button>
+          </div>
+          <div
+            id="hand-flyout"
+            className={`hand-flyout ${sheetOpen ? "is-open" : ""}`}
+            aria-hidden={!sheetOpen}
+          >
+            <Hand
+              presentation={cards}
+              previewCardId={previewCardId}
+              onPlay={(cardId) => act({ type: "playCard", cardId })}
+              onPreview={setPreviewCardId}
+            />
+          </div>
+        </div>
       ) : null}
 
       {state.phase === "gameOver" ? (
