@@ -155,14 +155,7 @@ function CardFace({
   onPlay: (cardId: string) => void
   onPreview: (cardId: string | null) => void
 }) {
-  const body = (
-    <>
-      <EffectRows card={card} />
-      <span className="card-kind">
-        {card.kind === "risk" ? card.title : card.kind}
-      </span>
-    </>
-  );
+  const body = <EffectRows card={card} />;
 
   const previewHandlers = playable
     ? {

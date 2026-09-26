@@ -87,9 +87,9 @@ export function LastDrawnStrip({ state }: { state: GameState }) {
     >
       <span className="last-drawn-label">Last drawn</span>
       <DrawnEffectRows card={card} />
-      <span className="card-kind last-drawn-kind">
-        {card.kind === "risk" ? card.title : card.kind}
-      </span>
+      {card.kind === "risk" ? (
+        <span className="card-kind last-drawn-kind">{card.title}</span>
+      ) : null}
     </section>
   );
 }
