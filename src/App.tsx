@@ -456,27 +456,28 @@ function Scoreboard({
                         className={count === 0 && !showTrade ? "dim" : undefined}
                       >
                         <span className="holdings-cell">
+                          {showTrade && trade ? (
+                            <button
+                              type="button"
+                              className="holdings-trade-btn"
+                              onClick={() => trade.onBuy(company)}
+                              aria-label={`Buy ${COMPANY_LABEL[company]}`}
+                            >
+                              Buy
+                            </button>
+                          ) : null}
                           <FlashOnChange value={count}>
                             <span className="holdings-count">{count}</span>
                           </FlashOnChange>
                           {showTrade && trade ? (
-                            <span className="holdings-trade">
-                              <button
-                                type="button"
-                                onClick={() => trade.onBuy(company)}
-                                aria-label={`Buy ${COMPANY_LABEL[company]}`}
-                              >
-                                Buy
-                              </button>
-                              <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => trade.onSell(company)}
-                                aria-label={`Sell ${COMPANY_LABEL[company]}`}
-                              >
-                                Sell
-                              </button>
-                            </span>
+                            <button
+                              type="button"
+                              className="holdings-trade-btn secondary"
+                              onClick={() => trade.onSell(company)}
+                              aria-label={`Sell ${COMPANY_LABEL[company]}`}
+                            >
+                              Sell
+                            </button>
                           ) : null}
                         </span>
                       </td>
