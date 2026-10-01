@@ -343,7 +343,6 @@ h2 {
   grid-row: 2;
 }
 
-.trade-strip-panel,
 .market-chart-details {
   grid-column: 1;
 }
@@ -386,8 +385,7 @@ h2 {
 .hand-panel,
 .picker-panel,
 .game-over-panel,
-.play-feed-panel,
-.trade-strip-panel {
+.play-feed-panel {
   margin: 0;
   padding: 1rem 1.05rem 1.1rem;
   border: 1px solid var(--line);
@@ -561,8 +559,7 @@ h2 {
 }
 
 .price-meta,
-.share-trade,
-.trade-toolbar,
+.holdings-trade-toolbar,
 .action-row {
   display: flex;
   flex-wrap: wrap;
@@ -659,9 +656,9 @@ h2 {
   opacity: 0.7;
 }
 
-.trade-toolbar {
-  margin-top: 1rem;
-  padding-top: 0.85rem;
+.holdings-trade-toolbar {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--line);
   justify-content: space-between;
 }
@@ -774,10 +771,35 @@ h2 {
   opacity: 0.4;
 }
 
+.holdings-cell {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+}
+
 .holdings-count {
+  display: block;
   font-weight: 700;
   font-size: 1rem;
   color: var(--ink);
+}
+
+.holdings-trade {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  max-width: 4.5rem;
+}
+
+.holdings-trade button {
+  width: 100%;
+  padding: 0.28rem 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.holdings-player-row.trading td {
+  vertical-align: top;
 }
 
 .holdings-market-row th,
@@ -822,35 +844,6 @@ h2 {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.trade-strip {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.trade-strip > li {
-  display: grid;
-  gap: 0.35rem;
-  justify-items: center;
-  padding: 0.55rem 0.35rem;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid transparent;
-}
-
-.trade-strip .share-trade {
-  justify-content: center;
-  width: 100%;
-}
-
-.trade-strip .share-trade button {
-  padding: 0.35rem 0.55rem;
-  font-size: 0.8rem;
 }
 
 .score-row {
@@ -1426,16 +1419,10 @@ h2 {
     order: 2;
   }
 
-  .trade-strip-panel {
-    grid-column: 1;
-    grid-row: auto;
-    order: 3;
-  }
-
   .market-chart-details {
     grid-column: 1;
     grid-row: auto;
-    order: 4;
+    order: 3;
   }
 
   .market-chart-details > summary {
@@ -1458,8 +1445,13 @@ h2 {
     grid-column: 1 / -1;
   }
 
-  .trade-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .holdings-trade {
+    max-width: 3.75rem;
+  }
+
+  .holdings-trade button {
+    padding: 0.24rem 0.28rem;
+    font-size: 0.68rem;
   }
 
   .play-dock {
